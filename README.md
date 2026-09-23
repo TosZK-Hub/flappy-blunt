@@ -6,9 +6,11 @@ This is the Feel-CLEAR web playable: Visual System V2, Wanted-slab home, nugs / 
 
 ## Play
 
-Live: [https://toszk-hub.github.io/flappy-blunt/](https://toszk-hub.github.io/flappy-blunt/)
+[https://toszk-hub.github.io/flappy-blunt/](https://toszk-hub.github.io/flappy-blunt/)
 
-`index.html` is at the repository root. To play on your machine:
+GitHub Pages publishes the default branch `main` from the repository root (`/`). `index.html` is already there, with `.nojekyll` so the canvas game is served as static files.
+
+To play on your machine:
 
 ```bash
 git clone https://github.com/TosZK-Hub/flappy-blunt.git
