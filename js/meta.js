@@ -35,6 +35,9 @@
       bestRun: 0,
       deaths: 0,
       weekBest: 0,
+      lifetimePipes: 0,
+      pipe5: false,
+      heist15: false,
       claimed: {},
     };
   }
@@ -71,9 +74,11 @@
               }
             }
           }
-          ["dailyAt", "weekAt", "pipes", "bestRun", "deaths", "weekBest"].forEach(function (k) {
+          ["dailyAt", "weekAt", "pipes", "bestRun", "deaths", "weekBest", "lifetimePipes"].forEach(function (k) {
             if (Number.isFinite(parsed[k]) && parsed[k] >= 0) state[k] = parsed[k];
           });
+          if (parsed.pipe5) state.pipe5 = true;
+          if (parsed.heist15) state.heist15 = true;
           if (parsed.claimed && typeof parsed.claimed === "object") state.claimed = parsed.claimed;
         }
       } catch (e) {
@@ -141,6 +146,14 @@
       WEEK: WEEK,
       nugs: function () { refresh(); return state.nugs; },
       owns: function (id) { refresh(); return owns(id); },
+      ownedCount: function () { refresh(); return state.owned.length; },
+      armHeist: function () {
+        refresh();
+        if (state.heist15) return false;
+        state.heist15 = true;
+        save();
+        return true;
+      },
       addNugs: function (n) {
         refresh();
         const add = Math.max(0, Math.floor(n || 0));
@@ -151,7 +164,15 @@
       notePipe: function () {
         refresh();
         state.pipes += 1;
+        state.lifetimePipes += 1;
+        let grant = 0;
+        if (!state.pipe5 && state.lifetimePipes === 5) {
+          state.pipe5 = true;
+          state.nugs += 25;
+          grant = 25;
+        }
         save();
+        return grant;
       },
       noteScore: function (score) {
         refresh();

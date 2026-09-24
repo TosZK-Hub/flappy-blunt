@@ -1092,6 +1092,10 @@
       const card = view.cards[i];
       const owned = ui.owns(card.id);
       const equipped = ui.skin === card.id;
+      const hot = card.id === ui.hover || card.id === ui.focus;
+      const phase = Math.sin((ui.time || 0) * 4.2);
+      const bob = hot ? phase * (ui.reduceMotion ? 2 : 9) : 0;
+      const tilt = hot && !ui.reduceMotion ? phase * 0.1 : 0;
       paintTag(ctx, card.x, card.y, card.w, card.h);
       ctx.save();
       pathRound(ctx, card.x + 6, card.y + 8, card.w - 12, 78, 6);
@@ -1100,7 +1104,8 @@
       ctx.fillRect(card.x + 6, card.y + 8, card.w - 12, 78);
       if (!owned) ctx.globalAlpha = 0.4;
       ctx.save();
-      ctx.translate(card.x + card.w / 2, card.y + 50);
+      ctx.translate(card.x + card.w / 2, card.y + 50 + bob);
+      ctx.rotate(tilt);
       ctx.scale(0.36, 0.36);
       drawBlunt(ctx, card.id, {});
       ctx.restore();
@@ -1119,10 +1124,22 @@
         ctx.lineWidth = 3;
         ctx.strokeStyle = Pal.GOLD;
         ctx.stroke();
+      } else if (card.id === ui.focus) {
+        pathRound(ctx, card.x + 2, card.y + 2, card.w - 4, card.h - 4, 10);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(243, 232, 212, 0.7)";
+        ctx.stroke();
       }
+      const status = equipped ? "EQUIPPED" : owned ? "OWNED" : "LOCKED";
+      const statusColor = equipped ? Pal.GOLD : Pal.CREAM;
+      ctx.save();
+      if (!owned) ctx.globalAlpha = 0.72;
+      stamp(ctx, status, card.x + card.w / 2, card.y + 136, 8, statusColor);
+      ctx.restore();
       if (owned) drawCheck(ctx, card.x + card.w / 2, card.y + 156);
       else drawCoin(ctx, card.x + card.w / 2, card.y + 158, 16, card.price === 0 ? "0" : String(card.price));
     }
+    if (ui.whisper) stamp(ctx, "Earn nugs on runs", P.W / 2, view.panel.y + view.panel.h - 48, 12, Pal.CREAM);
     text(ctx, "COSMETICS ONLY", P.W / 2, view.panel.y + view.panel.h - 28, 12, Pal.CREAM, null);
   }
 
@@ -1173,9 +1190,10 @@
     for (let i = 0; i < view.rows.length; i++) {
       const row = view.rows[i];
       drawInset(ctx, row.x, row.y, row.w, row.h);
-      stamp(ctx, (row.period === "week" ? "WEEK" : "DAY") + "  " + row.name.toUpperCase(), row.x + 150, row.y + 22, 13, Pal.CREAM);
+      stamp(ctx, (row.period === "week" ? "WEEK" : "DAY") + "  " + row.name.toUpperCase(), row.x + 150, row.y + 20, 12, Pal.CREAM);
       const trackW = row.pay.x - row.x - 16;
-      drawResin(ctx, row.x + 12, row.y + 38, trackW, 14, row.progress / row.goal);
+      drawResin(ctx, row.x + 12, row.y + 36, trackW, 12, row.progress / row.goal);
+      stamp(ctx, row.progress + "/" + row.goal, row.x + 36, row.claim.y + row.claim.h / 2, 16, Pal.CREAM);
       drawCoin(ctx, row.pay.x + row.pay.w / 2, row.pay.y + row.pay.h / 2, 18, String(row.reward));
       if (row.ready) drawGoldButton(ctx, row.claim, "CLAIM");
       else drawGhostButton(ctx, row.claim, row.claimed ? "GOT" : "CLAIM");
@@ -1223,8 +1241,9 @@
     return { x: 286, y: 14, w: 120, h: 44 };
   }
 
-  function drawNugs(ctx, n) {
+  function drawNugs(ctx, n, pop) {
     const b = nugBox();
+    const lift = pop > 0 ? pop : 0;
     ctx.save();
     pathRound(ctx, b.x, b.y, b.w, b.h, 22);
     const pill = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
@@ -1235,8 +1254,21 @@
     ctx.lineWidth = 2.25;
     ctx.strokeStyle = Pal.GOLD;
     ctx.stroke();
-    drawLeaf(ctx, b.x + 24, b.y + b.h / 2, 1.05);
+    ctx.save();
+    ctx.translate(b.x + 24, b.y + b.h / 2);
+    ctx.scale(1 + lift * 0.45, 1 + lift * 0.45);
+    drawLeaf(ctx, 0, 0, 1.05);
+    ctx.restore();
     text(ctx, String(n), b.x + 76, b.y + b.h / 2 + 1, 18, Pal.CREAM, Pal.INK);
+    ctx.restore();
+  }
+
+  function drawToast(ctx, toast) {
+    if (!toast || toast.life <= 0 || !toast.text) return;
+    const fade = toast.life < 0.28 ? Math.max(0, toast.life / 0.28) : 1;
+    ctx.save();
+    ctx.globalAlpha = fade;
+    stamp(ctx, toast.text, P.W / 2, toast.y || 148, 15, Pal.CREAM);
     ctx.restore();
   }
 
@@ -1318,6 +1350,13 @@
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+      if (p.kind === "leaf") {
+        ctx.rotate(p.rot || 0);
+        ctx.scale(p.size || 0.7, p.size || 0.7);
+        drawLeaf(ctx, 0, 0, 1);
         ctx.restore();
         continue;
       }
@@ -1482,6 +1521,17 @@
     drawCreamChip(ctx, home.best, "BEST  " + (ui.best || 0));
 
     const bob = Math.sin((ui.time || 0) * 2.15) * 7;
+    if (ui.equippedRing) {
+      ctx.save();
+      ctx.translate(P.W / 2, 336 + bob);
+      ctx.strokeStyle = Pal.GOLD;
+      ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 0.92;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 66, 34, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.save();
     ctx.translate(P.W / 2, 336 + bob);
     ctx.rotate(ui.rot || 0);
@@ -1659,6 +1709,7 @@
     menuHit,
     playHit,
     drawNugs,
+    drawToast,
     drawClean,
     cleanHit,
     drawBuffs,

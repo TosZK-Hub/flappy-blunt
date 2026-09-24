@@ -56,9 +56,19 @@ The public repo is [github.com/TosZK-Hub/flappy-blunt](https://github.com/TosZK-
 
 No in-app purchases, no ads, no analytics vendor. Nugs are a local cosmetic balance. Score banks 1:1 into nugs when you crash. The leaf counter sits top-right.
 
-Jobs refresh every 24 hours on this device: clear 5 pipes (25), score 15 in one run (50), die 3 times (15), and a weekly best of 30 (150). Claim them on the gold button. Jobs never ask for a power-up.
+Jobs refresh every 24 hours on this device: clear 5 pipes (25), score 15 in one run (50), die 3 times (15), and a weekly best of 30 (150). Each row shows the goal, progress as X/Y, the payout, and **CLAIM**. **CLAIM** is gold only when the job is ready. Claiming banks nugs and pops the leaf on the counter. Jobs never ask for a power-up.
 
-The shop sells cosmetics only. Default is free. Gold Chain is 200, Neon Kush 350, Galaxy Roll 500, OG Heist 750. Owned skins show a green check. The equipped skin has a gold ring.
+On a crash, if any job moved forward, one cream toast says “Job +1” for under 1.5 seconds. It does not cover **RESTART**.
+
+The shop sells cosmetics only. Default is free. Gold Chain is 200, Neon Kush 350, Galaxy Roll 500, OG Heist 750. Cards read **OWNED**, **EQUIPPED**, or **LOCKED**. Owned skins show a green check. The equipped skin has a gold ring. Hover or focus a card and that blunt bobs in place — a look, not a trial run. Tap an owned card to equip it immediately. Close the shop and the home hero wears it. A locked skin you cannot afford whispers “Earn nugs on runs”. The shop never says “Buy now”.
+
+## Progression
+
+Three free beats, once each, on this device. No XP bar, no battle pass, no ad gate.
+
+- The first time you clear 5 pipes, a cream whisper lands with 25 nugs.
+- When your best reaches 15, a toast says “Heist warming up”.
+- Own two or more skins and the home blunt wears a gold ring. It marks the equipped skin. It is not a paywall.
 
 ## Clean mode and pickups
 

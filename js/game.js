@@ -45,6 +45,12 @@
   let playedOnce = loadPlayed();
   let overlay = null;
   let banked = 0;
+  let shopHover = null;
+  let shopFocus = skin;
+  let shopWhisper = 0;
+  let nugPop = 0;
+  let jobsAtRun = null;
+  const toasts = [];
   let showHitboxes = /(?:\?|&)hitbox=1(?:&|$)/.test(window.location.search);
   let reduceMotion = false;
   try {
@@ -157,15 +163,70 @@
     return false;
   }
 
+  function jobSnap() {
+    const list = Meta.missions();
+    const snap = {};
+    for (let i = 0; i < list.length; i++) snap[list[i].id] = list[i].progress;
+    return snap;
+  }
+
+  function jobsProgressed() {
+    if (!jobsAtRun) return false;
+    const list = Meta.missions();
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].progress > (jobsAtRun[list[i].id] || 0)) return true;
+    }
+    return false;
+  }
+
+  function showToast(text, seconds, front) {
+    const life = seconds > 0 ? Math.min(seconds, 1.5) : 1.4;
+    const item = { text: text, life: life, max: life, y: 148 };
+    if (front) toasts.unshift(item);
+    else toasts.push(item);
+    if (toasts.length > 3) {
+      if (front) toasts.pop();
+      else toasts.shift();
+    }
+  }
+
+  function popNugs() {
+    nugPop = 1;
+    for (let i = 0; i < 6; i++) {
+      const a = -Math.PI * 0.5 + (i - 2.5) * 0.42;
+      spawn({
+        kind: "leaf",
+        x: 310,
+        y: 36,
+        vx: Math.cos(a) * (36 + Math.random() * 28),
+        vy: -70 - Math.random() * 50,
+        life: 0.55,
+        max: 0.55,
+        size: 0.72,
+        rot: Math.random() * 6,
+        spin: (Math.random() - 0.5) * 7,
+        front: true,
+        scroll: false,
+        hud: true,
+        grav: 220,
+      });
+    }
+  }
+
   function onShopCard(id) {
+    if (!id) return;
+    shopFocus = id;
     if (Meta.owns(id)) {
       setSkin(id);
       return;
     }
-    if (Meta.buy(id) === "bought") {
+    const result = Meta.buy(id);
+    if (result === "bought") {
       setSkin(id);
       Sfx.score();
+      return;
     }
+    if (result === "broke") shopWhisper = 2.2;
   }
 
   function saveBest(n) {
@@ -266,6 +327,7 @@
 
   function startPlaying() {
     markPlayed();
+    jobsAtRun = jobSnap();
     bestAtRunStart = best;
     newBest = false;
     run = P.createRun(undefined, { pickups: !cleanRun });
@@ -367,8 +429,12 @@
         color: Pal.GOLD,
       });
     }
-    Meta.notePipe();
+    const grant = Meta.notePipe();
     Meta.noteScore(run.score);
+    if (grant > 0) {
+      showToast("Five clear. +25 nugs", 1.5);
+      popNugs();
+    }
     Sfx.score();
     rings.push({ x: ev.gapX, y: ev.gapY, radius: 14, life: 0.5, max: 0.5 });
     floaters.push({ text: "+" + (ev.gain || 1), x: ev.gapX + 24, y: ev.gapY, life: 0.7, max: 0.7, vy: -42 });
@@ -381,6 +447,7 @@
       newBest = true;
       saveBest(best);
     }
+    if (run.score >= 15 && Meta.armHeist()) showToast("Heist warming up", 1.5);
   }
 
   function onPickup(id) {
@@ -520,6 +587,7 @@
     Meta.noteDeath(scored);
     Meta.addNugs(scored);
     banked = scored;
+    if (jobsProgressed()) showToast("Job +1", 1.4, true);
     Sfx.crash();
     if (newBest) Sfx.fanfare();
     const Pal = window.FBFeel.PALETTE;
@@ -545,6 +613,12 @@
   }
 
   function updateFx(dt) {
+    if (shopWhisper > 0) shopWhisper = Math.max(0, shopWhisper - dt);
+    if (nugPop > 0) nugPop = Math.max(0, nugPop - dt / 0.4);
+    if (toasts.length) {
+      toasts[0].life -= dt;
+      if (toasts[0].life <= 0) toasts.shift();
+    }
     const shift = worldSpeed * dt;
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
@@ -703,6 +777,7 @@
         skin: skin,
         rot: player.rot,
         whisper: !playedOnce,
+        equippedRing: Meta.ownedCount() >= 2,
       });
       if (!overlay) Draw.drawMenu(ctx, "title", claimReady());
     } else if (state === PLAYING && run) {
@@ -723,16 +798,30 @@
       if (!overlay) Draw.drawMenu(ctx, "over", claimReady());
     }
 
-    Draw.drawParticles(ctx, particles, true, true);
     Draw.drawFlash(ctx, flash, P.PLAYER_X, player.y);
     Draw.drawWhite(ctx, whiteFlash);
     Draw.drawVignette(ctx);
     if (overlay === "shop") {
-      Draw.drawShop(ctx, { nugs: Meta.nugs(), skin: skin, owns: function (id) { return Meta.owns(id); } });
+      Draw.drawShop(ctx, {
+        nugs: Meta.nugs(),
+        skin: skin,
+        time: time,
+        hover: shopHover,
+        focus: shopFocus,
+        whisper: shopWhisper > 0,
+        reduceMotion: reduceMotion,
+        owns: function (id) { return Meta.owns(id); },
+      });
     } else if (overlay === "jobs") {
       Draw.drawJobs(ctx);
     }
-    Draw.drawNugs(ctx, Meta.nugs());
+    Draw.drawNugs(ctx, Meta.nugs(), nugPop);
+    Draw.drawParticles(ctx, particles, true, true);
+    if (!overlay && toasts.length) {
+      const item = toasts[0];
+      item.y = state === OVER ? 132 : state === TITLE ? 248 : 168;
+      Draw.drawToast(ctx, item);
+    }
     Draw.drawMute(ctx, muted);
     if (showHitboxes && run && state !== TITLE) Draw.drawDebug(ctx, run);
 
@@ -780,7 +869,10 @@
       const hit = Draw.jobsHit(pt);
       if (hit && hit.action === "close") overlay = null;
       else if (hit && hit.action === "claim") {
-        if (Meta.claim(hit.id)) Sfx.score();
+        if (Meta.claim(hit.id)) {
+          Sfx.score();
+          popNugs();
+        }
       }
       return;
     }
@@ -796,6 +888,11 @@
       }
       if (menu) {
         overlay = menu;
+        if (menu === "shop") {
+          shopFocus = skin;
+          shopHover = null;
+          shopWhisper = 0;
+        }
         return;
       }
     }
@@ -805,6 +902,21 @@
     }
     press();
   }, { passive: false });
+
+  window.addEventListener("pointermove", function (e) {
+    if (overlay !== "shop") {
+      shopHover = null;
+      return;
+    }
+    const pt = toGame(e);
+    const hit = Draw.shopHit(pt);
+    if (hit && hit.action === "card") {
+      shopHover = hit.id;
+      shopFocus = hit.id;
+    } else {
+      shopHover = null;
+    }
+  });
 
   window.addEventListener("pointerup", function () {
     pointer = null;
@@ -819,6 +931,21 @@
     if (e.repeat || held[e.code]) return;
     held[e.code] = true;
     if (overlay) {
+      if (overlay === "shop" && (e.code === "ArrowLeft" || e.code === "ArrowRight")) {
+        e.preventDefault();
+        const skins = window.FBFeel.SKINS;
+        let i = 0;
+        for (let k = 0; k < skins.length; k++) if (skins[k].id === shopFocus) i = k;
+        const dir = e.code === "ArrowRight" ? 1 : -1;
+        shopFocus = skins[(i + dir + skins.length) % skins.length].id;
+        shopHover = null;
+        return;
+      }
+      if (overlay === "shop" && e.code === "Enter") {
+        e.preventDefault();
+        onShopCard(shopFocus);
+        return;
+      }
       if (e.code === "Escape" || e.code === "Space" || e.code === "ArrowUp") {
         e.preventDefault();
         overlay = null;

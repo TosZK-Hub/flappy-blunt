@@ -1,5 +1,5 @@
 /* Shell cache so Add to Home Screen can open after one visit. Network first. */
-const CACHE = "flappy-blunt-shell-3";
+const CACHE = "flappy-blunt-shell-4";
 const SHELL = [
   "./",
   "./index.html",
