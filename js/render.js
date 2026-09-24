@@ -127,7 +127,7 @@
     ctx.fill();
   }
 
-  /* Metal grinder discs. The neon hairline sits only on the gap face. */
+  /* Metal grinder discs. Dual cream speculars. Neon hairline only on the gap face. */
   function drawGrinder(ctx, tower, faceY, farY) {
     const bodyW = P.COL_W;
     const left = tower.x + (P.VIS_W - bodyW) / 2;
@@ -145,22 +145,32 @@
       const dh = Math.min(discH, bodyBot - y);
       const x = left - bulge;
       const w = bodyW + bulge * 2;
-      const g = ctx.createLinearGradient(0, y, 0, y + dh);
-      g.addColorStop(0, "#7A5A8C");
-      g.addColorStop(0.48, Pal.HAZE);
-      g.addColorStop(1, "#2A1838");
-      ctx.fillStyle = g;
+      ctx.save();
       pathRound(ctx, x, y, w, dh, Math.min(8, dh / 2));
-      ctx.fill();
-      ctx.fillStyle = "rgba(243, 232, 212, 0.18)";
+      ctx.clip();
+      const g = ctx.createLinearGradient(0, y, 0, y + dh);
+      g.addColorStop(0, "#8B6A9C");
+      g.addColorStop(0.22, "#7A5A8C");
+      g.addColorStop(0.5, Pal.HAZE);
+      g.addColorStop(0.78, "#2A1838");
+      g.addColorStop(1, "#1A0E24");
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 1, y - 1, w + 2, dh + 2);
+      const mid = y + dh * 0.5;
+      ctx.fillStyle = "rgba(243, 232, 212, 0.22)";
       ctx.beginPath();
-      ctx.ellipse(x + w / 2, y + 3.4, w * 0.34, 1.5, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + w / 2, y + 2.8, w * 0.34, 1.4, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "rgba(61, 219, 106, 0.22)";
+      ctx.fillStyle = "rgba(243, 232, 212, 0.10)";
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, mid - 1, w * 0.28, 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(61, 219, 106, 0.14)";
       ctx.beginPath();
       ctx.ellipse(x + 3, y + dh * 0.55, 1.5, 2.1, 0, 0, Math.PI * 2);
       ctx.ellipse(x + w - 3, y + dh * 0.55, 1.5, 2.1, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
       i += 1;
     }
 
@@ -168,29 +178,30 @@
     const capX = left - 5;
     const capW = bodyW + 10;
     const cap = ctx.createLinearGradient(0, capY, 0, capY + capH);
-    cap.addColorStop(0, "#8A6AAA");
-    cap.addColorStop(1, "#4A3068");
+    cap.addColorStop(0, "#A084BC");
+    cap.addColorStop(1, "#5A3C74");
     ctx.fillStyle = cap;
     pathRound(ctx, capX, capY, capW, capH, 4);
     ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = Pal.INK;
+    ctx.strokeStyle = Pal.NIGHT_INK;
     ctx.stroke();
 
     const hy = lipIsBottom ? faceY - 1.6 : faceY + 1.6;
-    const bloom = ctx.createRadialGradient(capX + capW / 2, hy, 1, capX + capW / 2, hy, capW * 0.45);
-    bloom.addColorStop(0, "rgba(61, 219, 106, 0.15)");
+    const bloomR = capW * 0.42;
+    const bloom = ctx.createRadialGradient(capX + capW / 2, hy, 1, capX + capW / 2, hy, bloomR);
+    bloom.addColorStop(0, "rgba(61, 219, 106, 0.10)");
     bloom.addColorStop(1, "rgba(61, 219, 106, 0)");
     ctx.fillStyle = bloom;
     ctx.beginPath();
-    ctx.ellipse(capX + capW / 2, hy, capW * 0.48, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(capX + capW / 2, hy, bloomR, 4.5, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = Pal.NEON_LEAF || Pal.NEON;
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = Pal.NEON_LEAF;
+    ctx.lineWidth = 2.75;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(capX + 5, hy);
-    ctx.lineTo(capX + capW - 5, hy);
+    ctx.moveTo(capX + 6, hy);
+    ctx.lineTo(capX + capW - 6, hy);
     ctx.stroke();
   }
 
@@ -295,6 +306,59 @@
     ctx.restore();
   }
 
+  /* Five-stop kraft cylinder, clipped to the blunt. No stacked wrap rects. */
+  function paintBluntBody(ctx, L, r0, r1, ash, id) {
+    ctx.save();
+    bluntPath(ctx, L, r0, r1);
+    ctx.clip();
+    const g = ctx.createLinearGradient(0, -r0, 0, r0);
+    if (ash) {
+      g.addColorStop(0, "#C4C0C6");
+      g.addColorStop(0.18, "#9A949C");
+      g.addColorStop(0.45, Pal.ASH);
+      g.addColorStop(0.72, "#4A4550");
+      g.addColorStop(1, "#2A262E");
+    } else if (id === "galaxy_roll") {
+      g.addColorStop(0, "#8A6BE0");
+      g.addColorStop(0.18, "#6C4BD6");
+      g.addColorStop(0.45, "#24143F");
+      g.addColorStop(0.72, "#12081F");
+      g.addColorStop(1, "#07040E");
+    } else {
+      g.addColorStop(0, Pal.KRAFT_HIGH);
+      g.addColorStop(0.18, "#D4B888");
+      g.addColorStop(0.45, Pal.KRAFT);
+      g.addColorStop(0.72, Pal.KRAFT_SHADOW);
+      g.addColorStop(1, "#5C4528");
+    }
+    ctx.fillStyle = g;
+    ctx.fillRect(-L, -r0 - 4, L * 2, (r0 + 4) * 2);
+    if (!ash && id === "galaxy_roll") {
+      const stars = ["#F3E8D4", "#E56BFF", "#7EB6FF", "#F0C14B"];
+      for (let i = 0; i < 14; i++) {
+        ctx.fillStyle = stars[i % stars.length];
+        ctx.beginPath();
+        ctx.arc(-20 + (i * 17) % 46, -8 + (i % 5) * 3.2, i % 3 === 0 ? 1.15 : 0.75, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    if (!ash && id !== "galaxy_roll") {
+      ctx.fillStyle = "rgba(243, 232, 212, 0.32)";
+      ctx.beginPath();
+      ctx.ellipse(-2, -6.6, 18, 3.8, -0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(26, 20, 32, 0.18)";
+      ctx.beginPath();
+      ctx.ellipse(0, 9.2, 16, 3.2, 0.05, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "multiply";
+      ctx.globalAlpha = 0.04;
+      ctx.fillStyle = grainPattern(ctx);
+      ctx.fillRect(-L, -r0 - 4, L * 2, (r0 + 4) * 2);
+    }
+    ctx.restore();
+  }
+
   function drawBlunt(ctx, skin, opts) {
     const o = opts || {};
     const ash = !!o.ash;
@@ -302,20 +366,14 @@
     const L = 68;
     const r0 = 16;
     const r1 = 11;
-    let wrap = Pal.WRAP;
-    let shadow = Pal.WRAP_SHADOW;
     let wing = "#F4F0E6";
     let wingTip = "#F4F0E6";
     if (ash) {
-      wrap = Pal.ASH;
-      shadow = "#4A4550";
       wing = "#8A8490";
       wingTip = "#8A8490";
     } else if (id === "neon_kush") {
       wingTip = Pal.CYAN;
     } else if (id === "galaxy_roll") {
-      wrap = "#24143F";
-      shadow = "#12081F";
       wing = "#6C4BD6";
       wingTip = "#E56BFF";
     } else if (id === "og_heist") {
@@ -337,43 +395,10 @@
     ctx.restore();
     ctx.shadowBlur = 0;
 
+    paintBluntBody(ctx, L, r0, r1, ash, id);
     bluntPath(ctx, L, r0, r1);
-    const fill = ctx.createLinearGradient(0, -r0, 0, r0);
-    const high = ash ? "#9A949C" : id === "galaxy_roll" ? "#6C4BD6" : Pal.KRAFT_HIGH;
-    fill.addColorStop(0, high);
-    fill.addColorStop(0.46, wrap);
-    fill.addColorStop(1, shadow);
-    ctx.fillStyle = fill;
-    ctx.fill();
-
-    if (!ash && id === "galaxy_roll") {
-      ctx.save();
-      bluntPath(ctx, L, r0, r1);
-      ctx.clip();
-      const stars = ["#F3E8D4", "#E56BFF", "#7EB6FF", "#F0C14B"];
-      for (let i = 0; i < 14; i++) {
-        ctx.fillStyle = stars[i % stars.length];
-        ctx.beginPath();
-        ctx.arc(-20 + (i * 17) % 46, -8 + (i % 5) * 3.2, i % 3 === 0 ? 1.15 : 0.75, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    if (!ash) {
-      ctx.save();
-      bluntPath(ctx, L, r0, r1);
-      ctx.clip();
-      ctx.fillStyle = "rgba(243, 232, 212, 0.28)";
-      ctx.beginPath();
-      ctx.ellipse(-6, -7, 16, 4, -0.1, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    bluntPath(ctx, L, r0, r1);
-    ctx.lineWidth = id === "neon_kush" && !ash ? 2.4 : 2;
-    ctx.strokeStyle = !ash && id === "neon_kush" ? Pal.NEON : Pal.INK;
+    ctx.lineWidth = !ash && id === "neon_kush" ? 2.4 : 2;
+    ctx.strokeStyle = !ash && id === "neon_kush" ? Pal.NEON : Pal.NIGHT_INK;
     ctx.stroke();
 
     if (!ash && id === "default") {
@@ -1030,6 +1055,80 @@
     return { panel: panel, restart: restart, jobs: jobs, shop: shop, home: home };
   }
 
+  /* Bank chips sit above RESTART and never cover it. The job chip is ghost, not gold. */
+  function stashLayout(showJob) {
+    const d = deathLayout();
+    const h = 28;
+    const gap = 6;
+    const n = showJob ? 2 : 1;
+    const stackH = n * h + (n - 1) * gap;
+    const y = d.restart.y - 10 - stackH;
+    const w = 220;
+    const x = (P.W - w) / 2;
+    return {
+      nugs: { x: x, y: y, w: w, h: h },
+      job: showJob ? { x: x, y: y + h + gap, w: w, h: h } : null,
+    };
+  }
+
+  function stashHit(pt, showJob) {
+    const s = stashLayout(!!showJob);
+    if (s.job && hitRect(pt, s.job)) return "jobs";
+    return null;
+  }
+
+  /* Five skin marks under the best line. Outside the PLAY rect. */
+  function collectionLayout() {
+    const count = Feel.SKINS.length;
+    const slot = 34;
+    const w = count * slot;
+    const x = (P.W - w) / 2;
+    return { x: x, y: 236, w: w, h: 32, slot: slot };
+  }
+
+  function collectionHit(pt) {
+    return hitRect(pt, collectionLayout());
+  }
+
+  function drawCreamChip(ctx, r, label) {
+    ctx.save();
+    pathRound(ctx, r.x, r.y, r.w, r.h, 12);
+    ctx.fillStyle = "rgba(26, 20, 32, 0.72)";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = Pal.CREAM;
+    ctx.stroke();
+    text(ctx, label, r.x + r.w / 2, r.y + r.h / 2 + 1, 13, Pal.CREAM, null);
+    ctx.restore();
+  }
+
+  function drawCollection(ctx, ui) {
+    const strip = collectionLayout();
+    const skins = Feel.SKINS;
+    const owns = ui.owns || function () { return false; };
+    for (let i = 0; i < skins.length; i++) {
+      const id = skins[i].id;
+      const owned = !!owns(id);
+      const cx = strip.x + strip.slot * i + strip.slot / 2;
+      const cy = strip.y + strip.h / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(0.28, 0.28);
+      if (!owned) ctx.globalAlpha = 0.32;
+      drawBlunt(ctx, owned ? id : "default", { ash: !owned });
+      ctx.restore();
+      if (owned && ui.skin === id) {
+        ctx.save();
+        ctx.strokeStyle = Pal.GOLD;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 13, 9, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
   function panelFrame() {
     return {
       panel: { x: 16, y: 72, w: 388, h: 600 },
@@ -1472,6 +1571,7 @@
 
     drawWantedMark(ctx, ui.best);
     stamp(ctx, "One flap. Chill heist energy.", P.W / 2, 214, 13, Pal.CREAM);
+    drawCollection(ctx, ui);
 
     const bob = Math.sin((ui.time || 0) * 2.15) * 7;
     if (ui.equippedRing) {
@@ -1541,14 +1641,16 @@
     const d = deathLayout();
     const panel = d.panel;
     paintPlate(ctx, panel.x, panel.y, panel.w, panel.h, 24);
-    drawSlab(ctx, "NIGHT HEIST", P.W / 2, panel.y + 78, 16, Pal.CREAM);
-    drawSlab(ctx, "GAME OVER", P.W / 2, panel.y + 124, 36, Pal.CREAM);
-    stamp(ctx, ui.rank.toUpperCase(), P.W / 2, panel.y + 156, 13, Pal.EMBER);
-    stamp(ctx, "SCORE", P.W / 2, panel.y + 188, 14, Pal.CREAM);
-    drawSlab(ctx, String(ui.score), P.W / 2, panel.y + 242, 68, Pal.CREAM);
-    stamp(ctx, "BEST", P.W / 2, panel.y + 292, 13, Pal.GOLD);
-    stamp(ctx, String(ui.best || 0), P.W / 2, panel.y + 324, 28, Pal.GOLD);
-    stamp(ctx, "+" + (ui.banked || 0) + " NUGS", P.W / 2, panel.y + 358, 14, Pal.NEON);
+    drawSlab(ctx, "NIGHT HEIST", P.W / 2, panel.y + 70, 16, Pal.CREAM);
+    drawSlab(ctx, "GAME OVER", P.W / 2, panel.y + 108, 34, Pal.CREAM);
+    stamp(ctx, ui.rank.toUpperCase(), P.W / 2, panel.y + 136, 13, Pal.EMBER);
+    stamp(ctx, "SCORE", P.W / 2, panel.y + 160, 14, Pal.CREAM);
+    drawSlab(ctx, String(ui.score), P.W / 2, panel.y + 202, 56, Pal.CREAM);
+    stamp(ctx, "BEST", P.W / 2, panel.y + 244, 13, Pal.GOLD);
+    stamp(ctx, String(ui.best || 0), P.W / 2, panel.y + 268, 24, Pal.GOLD);
+    const stash = stashLayout(!!ui.jobClaim);
+    drawCreamChip(ctx, stash.nugs, "+" + (ui.banked || 0) + " nugs");
+    if (stash.job) drawGhostButton(ctx, stash.job, "Job claim ready");
     if (ui.ready) drawGoldButton(ctx, d.restart, "RESTART");
     else stamp(ctx, "…", P.W / 2, d.restart.y + d.restart.h / 2, 18, Pal.CREAM);
   }
@@ -1661,6 +1763,8 @@
     drawMenu,
     menuHit,
     playHit,
+    collectionHit,
+    stashHit,
     drawNugs,
     drawToast,
     drawClean,
