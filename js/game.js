@@ -295,6 +295,7 @@
   }
 
   function onFlap(player) {
+    player.emberKick = time;
     Sfx.flap();
     const Pal = window.FBFeel.PALETTE;
     const body = window.FBFeel.bodyDraw();

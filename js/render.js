@@ -261,22 +261,35 @@
     ctx.stroke();
   }
 
+  /* Soft arcade feathers: cream core, 10% halo, vein only on the inner three. */
   function featherWing(ctx, fill, tip) {
     ctx.save();
     ctx.translate(-8, -6);
     for (let i = 0; i < 5; i++) {
       ctx.save();
       ctx.rotate(-1.05 + i * 0.34);
+      const rx = 15 - i * 1.1;
+      const ry = 4.2;
+      ctx.fillStyle = "rgba(244, 240, 230, 0.22)";
+      ctx.beginPath();
+      ctx.ellipse(16, 0, rx * 1.1, ry * 1.1, 0, 0, Math.PI * 2);
+      ctx.fill();
       const feather = ctx.createLinearGradient(0, -5, 22, 5);
       feather.addColorStop(0, fill);
       feather.addColorStop(1, i >= 3 && tip ? tip : "rgba(243, 232, 212, 0.85)");
       ctx.fillStyle = feather;
       ctx.beginPath();
-      ctx.ellipse(16, 0, 15 - i * 1.1, 4.2, 0, 0, Math.PI * 2);
+      ctx.ellipse(16, 0, rx, ry, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(26, 20, 32, 0.65)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
+      if (i < 3) {
+        ctx.strokeStyle = "rgba(26, 20, 32, 0.28)";
+        ctx.lineWidth = 1;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(16 - rx * 0.42, 0);
+        ctx.lineTo(16 + rx * 0.55, 0);
+        ctx.stroke();
+      }
       ctx.restore();
     }
     ctx.restore();
@@ -340,7 +353,9 @@
       const stars = ["#F3E8D4", "#E56BFF", "#7EB6FF", "#F0C14B"];
       for (let i = 0; i < 14; i++) {
         ctx.fillStyle = stars[i % stars.length];
-        ctx.fillRect(-20 + (i * 17) % 46, -8 + (i % 5) * 3.2, i % 3 === 0 ? 2.2 : 1.3, 1.3);
+        ctx.beginPath();
+        ctx.arc(-20 + (i * 17) % 46, -8 + (i % 5) * 3.2, i % 3 === 0 ? 1.15 : 0.75, 0, Math.PI * 2);
+        ctx.fill();
       }
       ctx.restore();
     }
@@ -367,7 +382,8 @@
       ctx.ellipse(-10, -15, 13, 7, -0.15, Math.PI, 0);
       ctx.fill();
       ctx.fillStyle = "#4E2C86";
-      ctx.fillRect(-24, -16, 22, 5);
+      pathRound(ctx, -24, -16, 22, 5, 2.5);
+      ctx.fill();
       ctx.fillStyle = Pal.NEON;
       ctx.beginPath();
       ctx.ellipse(-8, -18, 3.2, 4.2, 0, 0, Math.PI * 2);
@@ -387,11 +403,23 @@
       ctx.strokeStyle = Pal.GOLD;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.ellipse(-4, -2, 11, 5, 0, 0, Math.PI * 2);
+      ctx.ellipse(-8.6, -2, 5.5, 4.6, -0.06, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "#C9D2DC";
-      ctx.fillRect(-8, -3.2, 8, 2.2);
+      ctx.beginPath();
+      ctx.ellipse(2.8, -2, 5.5, 4.6, 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-3.2, -2);
+      ctx.lineTo(-0.4, -2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(201, 210, 220, 0.5)";
+      ctx.beginPath();
+      ctx.ellipse(-10, -3.3, 2.1, 0.95, -0.25, 0, Math.PI * 2);
+      ctx.ellipse(1.5, -3.3, 2.1, 0.95, -0.2, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     if (!ash && id === "og_heist") {
@@ -403,9 +431,11 @@
       ctx.lineTo(-16, -4);
       ctx.fill();
       ctx.fillStyle = "#2A241C";
-      ctx.fillRect(-8, -2, 16, 12);
-      ctx.strokeStyle = "#111";
-      ctx.strokeRect(-8, -2, 16, 12);
+      pathRound(ctx, -8, -2, 16, 12, 3);
+      ctx.fill();
+      ctx.strokeStyle = Pal.INK;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
 
     if (!ash && id !== "gold_chain") {
@@ -419,21 +449,27 @@
     drawSmile(ctx, ash ? Pal.INK : Pal.CREAM);
     if (!ash && id === "og_heist") {
       ctx.fillStyle = Pal.GOLD;
-      ctx.fillRect(2, 3.2, 2.4, 2.6);
+      pathRound(ctx, 2, 3.2, 2.4, 2.6, 1);
+      ctx.fill();
     }
     featherWing(ctx, wing, wingTip);
     if (!ash) {
       const tipX = L / 2 - 4;
+      const t = o.time != null ? o.time : chromeTime;
+      const wave = Math.sin(t * 6.5);
+      let pulse = 0.92 + 0.08 * wave;
+      const glowA = 0.12 + 0.03 * wave;
+      if (o.emberKick != null && t - o.emberKick >= 0 && t - o.emberKick <= 0.08) pulse *= 1.12;
       ctx.save();
-      ctx.shadowColor = "rgba(232, 168, 74, 0.15)";
+      ctx.shadowColor = "rgba(232, 168, 74, " + glowA.toFixed(3) + ")";
       ctx.shadowBlur = 8;
-      const ember = ctx.createRadialGradient(tipX, -0.6, 0.6, tipX, 0, 7.2);
+      const ember = ctx.createRadialGradient(tipX, -0.6, 0.6, tipX, 0, 7.2 * pulse);
       ember.addColorStop(0, "#FFE7C2");
       ember.addColorStop(0.42, id === "neon_kush" ? Pal.NEON : id === "galaxy_roll" ? "#FF6AD5" : Pal.EMBER_HOT);
       ember.addColorStop(1, id === "neon_kush" ? Pal.NEON_CYAN : Pal.EMBER);
       ctx.fillStyle = ember;
       ctx.beginPath();
-      ctx.arc(tipX, 0, 5.4, 0, Math.PI * 2);
+      ctx.arc(tipX, 0, 5.4 * pulse, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
       if (id === "og_heist") {
@@ -479,7 +515,7 @@
     if (p.shield) drawShieldRing(ctx);
     ctx.save();
     ctx.scale(p.sx || 1, p.sy || 1);
-    drawBlunt(ctx, p.skin || "default", { ash: p.ash });
+    drawBlunt(ctx, p.skin || "default", { ash: p.ash, emberKick: p.emberKick });
     ctx.restore();
     ctx.restore();
   }
@@ -959,12 +995,33 @@
     const dy = hot ? 1 : 0;
     const rad = Math.min(22, Math.max(18, r.h / 2));
     const y = r.y + dy;
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 2;
     pathRound(ctx, r.x, y, r.w, r.h, rad);
-    ctx.fillStyle = "rgba(26, 20, 32, 0.35)";
+    ctx.fillStyle = hot ? "rgba(26, 20, 32, 0.43)" : "rgba(26, 20, 32, 0.35)";
     ctx.fill();
+    ctx.restore();
+    pathRound(ctx, r.x, y, r.w, r.h, rad);
     ctx.lineWidth = 2.25;
     ctx.strokeStyle = Pal.CREAM;
     ctx.stroke();
+    ctx.save();
+    pathRound(ctx, r.x, y, r.w, r.h, rad);
+    ctx.clip();
+    const sheen = ctx.createLinearGradient(r.x, y, r.x, y + r.h * 0.4);
+    sheen.addColorStop(0, "rgba(243, 232, 212, 0.14)");
+    sheen.addColorStop(1, "rgba(243, 232, 212, 0)");
+    ctx.fillStyle = sheen;
+    ctx.fillRect(r.x, y, r.w, r.h * 0.4);
+    ctx.strokeStyle = "rgba(243, 232, 212, 0.22)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(r.x + Math.min(rad, 14), y + 2.5);
+    ctx.lineTo(r.x + r.w - Math.min(rad, 14), y + 2.5);
+    ctx.stroke();
+    ctx.restore();
     text(ctx, label, r.x + r.w / 2, y + r.h / 2 + 1, 14, Pal.CREAM, null);
   }
 
@@ -1409,8 +1466,8 @@
     ctx.restore();
   }
 
-  /* Home wordmark only. Cream face, ink stroke, gold top hairline, 4px shadow. */
-  function drawWantedLine(ctx, str, x, y, size) {
+  /* Home wordmark. Cream or gold face, ink stroke, gold top hairline, 4px shadow. */
+  function drawWantedLine(ctx, str, x, y, size, face) {
     ctx.save();
     ctx.font = size + "px " + SLAB;
     ctx.textAlign = "center";
@@ -1423,7 +1480,7 @@
     ctx.lineWidth = size * 0.12;
     ctx.strokeStyle = "#1A1420";
     ctx.strokeText(str, x, y);
-    ctx.fillStyle = "#F3E8D4";
+    ctx.fillStyle = face || "#F3E8D4";
     ctx.fillText(str, x, y);
     ctx.shadowColor = "transparent";
     ctx.shadowOffsetY = 0;
@@ -1439,20 +1496,24 @@
   }
 
   function drawWantedMark(ctx) {
-    const flapSize = 40;
-    const bluntSize = 44;
+    const wantedSize = 24;
+    const flapSize = 36;
+    const bluntSize = 40;
     const cx = P.W / 2;
-    const y1 = 120;
-    const y2 = 168;
+    const yW = 102;
+    const y1 = 136;
+    const y2 = 174;
     ctx.save();
+    ctx.font = wantedSize + "px " + SLAB;
+    const w0 = ctx.measureText("WANTED").width;
     ctx.font = flapSize + "px " + SLAB;
     const w1 = ctx.measureText("FLAPPY").width;
     ctx.font = bluntSize + "px " + SLAB;
     const w2 = ctx.measureText("BLUNT").width;
-    const w = Math.min(348, Math.max(w1, w2) + 48);
+    const w = Math.min(348, Math.max(w0, w1, w2) + 48);
     const x = cx - w / 2;
-    const y = 90;
-    const h = 102;
+    const y = 78;
+    const h = 116;
     ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
     ctx.shadowBlur = 8;
     ctx.shadowOffsetY = 4;
@@ -1467,8 +1528,9 @@
     ctx.strokeStyle = "rgba(240, 193, 75, 0.45)";
     ctx.stroke();
     ctx.restore();
-    drawWantedLine(ctx, "FLAPPY", cx, y1, flapSize);
-    drawWantedLine(ctx, "BLUNT", cx, y2, bluntSize);
+    drawWantedLine(ctx, "WANTED", cx, yW, wantedSize, "#F3E8D4");
+    drawWantedLine(ctx, "FLAPPY", cx, y1, flapSize, Pal.GOLD);
+    drawWantedLine(ctx, "BLUNT", cx, y2, bluntSize, Pal.GOLD);
   }
 
   function drawTitle(ctx, ui) {
