@@ -45,6 +45,8 @@
   let playedOnce = loadPlayed();
   let overlay = null;
   let banked = 0;
+  let jobClaim = false;
+  let nugPopDur = 0.4;
   let shopHover = null;
   let shopFocus = skin;
   let shopWhisper = 0;
@@ -179,6 +181,16 @@
     return false;
   }
 
+  function jobCompletedThisRun() {
+    if (!jobsAtRun) return false;
+    const list = Meta.missions();
+    for (let i = 0; i < list.length; i++) {
+      const before = jobsAtRun[list[i].id] || 0;
+      if (list[i].ready && before < list[i].goal) return true;
+    }
+    return false;
+  }
+
   function showToast(text, seconds, front) {
     const life = seconds > 0 ? Math.min(seconds, 1.5) : 1.4;
     const item = { text: text, life: life, max: life, y: 148 };
@@ -190,8 +202,11 @@
     }
   }
 
-  function popNugs() {
+  function popNugs(seconds) {
+    const dur = seconds > 0 ? seconds : 0.4;
     nugPop = 1;
+    nugPopDur = dur;
+    const life = seconds > 0 ? dur : 0.55;
     for (let i = 0; i < 6; i++) {
       const a = -Math.PI * 0.5 + (i - 2.5) * 0.42;
       spawn({
@@ -200,8 +215,8 @@
         y: 36,
         vx: Math.cos(a) * (36 + Math.random() * 28),
         vy: -70 - Math.random() * 50,
-        life: 0.55,
-        max: 0.55,
+        life: life,
+        max: life,
         size: 0.72,
         rot: Math.random() * 6,
         spin: (Math.random() - 0.5) * 7,
@@ -221,9 +236,13 @@
       return;
     }
     const result = Meta.buy(id);
-    if (result === "bought") {
+    if (result === "bought" || result === "crew") {
       setSkin(id);
       Sfx.score();
+      if (result === "crew") {
+        showToast("Full crew", 1.5);
+        popNugs();
+      }
       return;
     }
     if (result === "broke") shopWhisper = 2.2;
@@ -306,9 +325,17 @@
     }
   }
 
+  function openShop() {
+    overlay = "shop";
+    shopFocus = skin;
+    shopHover = null;
+    shopWhisper = 0;
+  }
+
   function goHome() {
     state = TITLE;
     overlay = null;
+    jobClaim = false;
     run = null;
     lock = 0;
     deathFreeze = 0;
@@ -327,6 +354,7 @@
 
   function startPlaying() {
     markPlayed();
+    jobClaim = false;
     jobsAtRun = jobSnap();
     bestAtRunStart = best;
     newBest = false;
@@ -588,7 +616,9 @@
     Meta.noteDeath(scored);
     Meta.addNugs(scored);
     banked = scored;
-    if (jobsProgressed()) showToast("Job +1", 1.4, true);
+    jobClaim = jobCompletedThisRun();
+    if (jobsProgressed() && !jobClaim) showToast("Job +1", 1.4, true);
+    popNugs(0.3);
     Sfx.crash();
     if (newBest) Sfx.fanfare();
     const Pal = window.FBFeel.PALETTE;
@@ -615,8 +645,8 @@
 
   function updateFx(dt) {
     if (shopWhisper > 0) shopWhisper = Math.max(0, shopWhisper - dt);
-    if (nugPop > 0) nugPop = Math.max(0, nugPop - dt / 0.4);
-    if (toasts.length) {
+    if (nugPop > 0) nugPop = Math.max(0, nugPop - dt / (nugPopDur || 0.4));
+    if (toasts.length && !overlay) {
       toasts[0].life -= dt;
       if (toasts[0].life <= 0) toasts.shift();
     }
@@ -779,6 +809,7 @@
         rot: player.rot,
         whisper: !playedOnce,
         equippedRing: Meta.ownedCount() >= 2,
+        owns: function (id) { return Meta.owns(id); },
       });
       if (!overlay) Draw.drawMenu(ctx, "title", claimReady());
     } else if (state === PLAYING && run) {
@@ -795,6 +826,7 @@
         hintAlpha: hintAlpha,
         ready: ready,
         banked: banked,
+        jobClaim: jobClaim,
       });
       if (!overlay) Draw.drawMenu(ctx, "over", claimReady());
     }
@@ -887,17 +919,24 @@
         goHome();
         return;
       }
+      if (menu === "shop") {
+        openShop();
+        return;
+      }
       if (menu) {
         overlay = menu;
-        if (menu === "shop") {
-          shopFocus = skin;
-          shopHover = null;
-          shopWhisper = 0;
-        }
         return;
       }
     }
+    if (state === OVER && deathFreeze <= 0 && Draw.stashHit(pt, jobClaim) === "jobs") {
+      overlay = "jobs";
+      return;
+    }
     if (state === TITLE) {
+      if (Draw.collectionHit(pt)) {
+        openShop();
+        return;
+      }
       if (Draw.playHit(pt)) press();
       return;
     }
@@ -1010,6 +1049,7 @@
   if (window.visualViewport) window.visualViewport.addEventListener("resize", layoutNow);
 
   function boot() {
+    const crewGrant = Meta.takeFullCrew();
     layoutNow();
     render();
     const start = function () {
@@ -1019,6 +1059,10 @@
         setTimeout(function () {
           if (splash.parentNode) splash.parentNode.removeChild(splash);
         }, 260);
+      }
+      if (crewGrant) {
+        showToast("Full crew", 1.5);
+        popNugs();
       }
       requestAnimationFrame(frame);
     };

@@ -38,6 +38,7 @@
       lifetimePipes: 0,
       pipe5: false,
       heist15: false,
+      fullCrew: false,
       claimed: {},
     };
   }
@@ -79,6 +80,7 @@
           });
           if (parsed.pipe5) state.pipe5 = true;
           if (parsed.heist15) state.heist15 = true;
+          if (parsed.fullCrew) state.fullCrew = true;
           if (parsed.claimed && typeof parsed.claimed === "object") state.claimed = parsed.claimed;
         }
       } catch (e) {
@@ -117,6 +119,21 @@
 
     function owns(id) {
       return state.owned.indexOf(id) >= 0;
+    }
+
+    function ownsAll() {
+      const ids = [];
+      for (const id in PRICES) ids.push(id);
+      if (ids.length < 5) return false;
+      for (let i = 0; i < ids.length; i++) if (!owns(ids[i])) return false;
+      return true;
+    }
+
+    function grantFullCrew() {
+      if (state.fullCrew || !ownsAll()) return 0;
+      state.fullCrew = true;
+      state.nugs += 100;
+      return 100;
     }
 
     function missions() {
@@ -203,8 +220,15 @@
         if (state.nugs < PRICES[id]) return "broke";
         state.nugs -= PRICES[id];
         state.owned.push(id);
+        const crew = grantFullCrew();
         save();
-        return "bought";
+        return crew ? "crew" : "bought";
+      },
+      takeFullCrew: function () {
+        refresh();
+        const n = grantFullCrew();
+        if (n) save();
+        return n;
       },
     };
   }
