@@ -620,7 +620,6 @@
 
   const SLAB = '"Anton", "Lilita One", sans-serif';
   let grainPat = null;
-  let blotchPat = null;
   let chromeTime = 0;
   let pressedPt = null;
 
@@ -662,79 +661,6 @@
     return grainPat;
   }
 
-  function blotchPattern(ctx) {
-    if (blotchPat) return blotchPat;
-    blotchPat = ctx.createPattern(noiseCanvas(96, 6, 70, 190), "repeat");
-    return blotchPat;
-  }
-
-  function drawTicks(ctx, x, y, w, h) {
-    const inset = 8;
-    const len = 13;
-    ctx.save();
-    ctx.strokeStyle = Pal.GOLD;
-    ctx.lineWidth = 1.6;
-    ctx.lineCap = "round";
-    const pts = [
-      [x + inset, y + inset, 1, 1],
-      [x + w - inset, y + inset, -1, 1],
-      [x + inset, y + h - inset, 1, -1],
-      [x + w - inset, y + h - inset, -1, -1],
-    ];
-    for (let i = 0; i < pts.length; i++) {
-      const c = pts[i];
-      ctx.beginPath();
-      ctx.moveTo(c[0], c[1] + c[3] * len);
-      ctx.lineTo(c[0], c[1]);
-      ctx.lineTo(c[0] + c[2] * len, c[1]);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  function screw(ctx, x, y) {
-    ctx.save();
-    ctx.fillStyle = "#1a120c";
-    ctx.beginPath();
-    ctx.arc(x, y + 0.6, 3.4, 0, Math.PI * 2);
-    ctx.fill();
-    const g = ctx.createRadialGradient(x - 1, y - 1, 0.2, x, y, 3);
-    g.addColorStop(0, "#f3e2b0");
-    g.addColorStop(1, "#8a6230");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, 2.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#2a1c10";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x - 1.7, y);
-    ctx.lineTo(x + 1.7, y);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function fillMaterial(ctx, x, y, w, h) {
-    const g = ctx.createLinearGradient(x, y, x, y + h);
-    g.addColorStop(0, "#4e3470");
-    g.addColorStop(0.38, "#2A1638");
-    g.addColorStop(1, "#140c1c");
-    ctx.fillStyle = g;
-    ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-    const sheen = ctx.createLinearGradient(x, y, x + w * 0.2, y + h * 0.55);
-    sheen.addColorStop(0, "rgba(243, 232, 212, 0.16)");
-    sheen.addColorStop(0.45, "rgba(243, 232, 212, 0.03)");
-    sheen.addColorStop(1, "rgba(0, 0, 0, 0.28)");
-    ctx.fillStyle = sheen;
-    ctx.fillRect(x, y, w, h);
-    ctx.save();
-    ctx.globalCompositeOperation = "soft-light";
-    ctx.globalAlpha = 0.14;
-    ctx.fillStyle = grainPattern(ctx);
-    ctx.fillRect(x, y, w, h);
-    ctx.restore();
-  }
-
   /* Soft night pill. Cream at the top-left, shadow at the bottom-right. No screws. */
   function paintPlate(ctx, x, y, w, h, rad) {
     let r = rad == null ? 24 : rad;
@@ -772,7 +698,6 @@
     ctx.fillStyle = br;
     ctx.fillRect(x, y, w, h);
     ctx.restore();
-    if (w > 160 && h > 80) drawTicks(ctx, x, y, w, h);
   }
 
   function stamp(ctx, str, x, y, size, fill) {
@@ -1480,18 +1405,6 @@
     ctx.restore();
   }
 
-  function drawCreamChip(ctx, r, label) {
-    ctx.save();
-    pathRound(ctx, r.x, r.y, r.w, r.h, 12);
-    ctx.fillStyle = "rgba(26, 20, 32, 0.72)";
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = Pal.CREAM;
-    ctx.stroke();
-    text(ctx, label, r.x + r.w / 2, r.y + r.h / 2 + 1, 14, Pal.CREAM, null);
-    ctx.restore();
-  }
-
   function wordHairline(ctx, str, x, y, size) {
     ctx.save();
     ctx.font = size + "px " + SLAB;
@@ -1505,7 +1418,7 @@
     ctx.restore();
   }
 
-  /* Home wordmark. Cream or gold face, ink stroke, gold top hairline, 4px shadow. */
+  /* Sheet wordmark: cream or gold face, ink stroke, 4px shadow. No extra badge. */
   function drawWantedLine(ctx, str, x, y, size, face) {
     ctx.save();
     ctx.font = size + "px " + SLAB;
@@ -1519,57 +1432,36 @@
     ctx.lineWidth = size * 0.12;
     ctx.strokeStyle = "#1A1420";
     ctx.strokeText(str, x, y);
-    ctx.fillStyle = face || "#F3E8D4";
+    ctx.fillStyle = face || Pal.CREAM;
     ctx.fillText(str, x, y);
-    ctx.shadowColor = "transparent";
-    ctx.shadowOffsetY = 0;
-    const half = ctx.measureText(str).width / 2;
-    ctx.strokeStyle = "#F0C14B";
-    ctx.lineWidth = Math.max(1.5, size * 0.045);
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(x - half * 0.92, y - size * 0.5);
-    ctx.lineTo(x + half * 0.92, y - size * 0.5);
-    ctx.stroke();
     ctx.restore();
   }
 
-  function drawWantedMark(ctx) {
-    const wantedSize = 24;
-    const flapSize = 36;
-    const bluntSize = 40;
+  /* Chrome sheet: cream WANTED, one gold FLAPPY BLUNT line, small best under it. */
+  function drawWantedMark(ctx, best) {
     const cx = P.W / 2;
-    const yW = 102;
-    const y1 = 136;
-    const y2 = 174;
+    let titleSize = 32;
     ctx.save();
-    ctx.font = wantedSize + "px " + SLAB;
-    const w0 = ctx.measureText("WANTED").width;
-    ctx.font = flapSize + "px " + SLAB;
-    const w1 = ctx.measureText("FLAPPY").width;
-    ctx.font = bluntSize + "px " + SLAB;
-    const w2 = ctx.measureText("BLUNT").width;
-    const w = Math.min(348, Math.max(w0, w1, w2) + 48);
-    const x = cx - w / 2;
-    const y = 78;
-    const h = 116;
-    ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetY = 4;
-    pathRound(ctx, x, y, w, h, 18);
-    const g = ctx.createLinearGradient(x, y, x, y + h);
-    g.addColorStop(0, "#241428");
-    g.addColorStop(1, "#100814");
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "rgba(240, 193, 75, 0.45)";
-    ctx.stroke();
+    ctx.font = titleSize + "px " + SLAB;
+    while (titleSize > 24 && ctx.measureText("FLAPPY BLUNT").width > 336) {
+      titleSize -= 1;
+      ctx.font = titleSize + "px " + SLAB;
+    }
+    const wantedSize = Math.round(titleSize * 1.2);
     ctx.restore();
-    drawWantedLine(ctx, "WANTED", cx, yW, wantedSize, "#F3E8D4");
-    drawWantedLine(ctx, "FLAPPY", cx, y1, flapSize, Pal.GOLD);
-    drawWantedLine(ctx, "BLUNT", cx, y2, bluntSize, Pal.GOLD);
+    const yW = 114;
+    const yT = Math.round(yW + wantedSize * 0.58 + titleSize * 0.46);
+    const yB = Math.round(yT + titleSize * 0.52 + 14);
+    drawWantedLine(ctx, "WANTED", cx, yW, wantedSize, Pal.CREAM);
+    drawWantedLine(ctx, "FLAPPY BLUNT", cx, yT, titleSize, Pal.GOLD);
+    ctx.save();
+    ctx.font = "16px " + FONT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = Pal.CREAM;
+    ctx.globalAlpha = 0.92;
+    ctx.fillText("best  " + (best || 0), cx, yB);
+    ctx.restore();
   }
 
   function drawTitle(ctx, ui) {
@@ -1578,9 +1470,8 @@
     ctx.fillRect(0, 0, P.W, P.H);
     paintPlate(ctx, home.plate.x, home.plate.y, home.plate.w, home.plate.h, 22);
 
-    drawWantedMark(ctx);
-    stamp(ctx, "One flap. Chill heist energy.", P.W / 2, 204, 13, Pal.CREAM);
-    drawCreamChip(ctx, home.best, "BEST  " + (ui.best || 0));
+    drawWantedMark(ctx, ui.best);
+    stamp(ctx, "One flap. Chill heist energy.", P.W / 2, 214, 13, Pal.CREAM);
 
     const bob = Math.sin((ui.time || 0) * 2.15) * 7;
     if (ui.equippedRing) {
