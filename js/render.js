@@ -620,7 +620,6 @@
 
   const SLAB = '"Anton", "Lilita One", sans-serif';
   let grainPat = null;
-  let blotchPat = null;
   let chromeTime = 0;
   let pressedPt = null;
 
@@ -660,55 +659,6 @@
     if (grainPat) return grainPat;
     grainPat = ctx.createPattern(noiseCanvas(96, 1, 214, 255), "repeat");
     return grainPat;
-  }
-
-  function blotchPattern(ctx) {
-    if (blotchPat) return blotchPat;
-    blotchPat = ctx.createPattern(noiseCanvas(96, 6, 70, 190), "repeat");
-    return blotchPat;
-  }
-
-  function screw(ctx, x, y) {
-    ctx.save();
-    ctx.fillStyle = "#1a120c";
-    ctx.beginPath();
-    ctx.arc(x, y + 0.6, 3.4, 0, Math.PI * 2);
-    ctx.fill();
-    const g = ctx.createRadialGradient(x - 1, y - 1, 0.2, x, y, 3);
-    g.addColorStop(0, "#f3e2b0");
-    g.addColorStop(1, "#8a6230");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, 2.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#2a1c10";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x - 1.7, y);
-    ctx.lineTo(x + 1.7, y);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  function fillMaterial(ctx, x, y, w, h) {
-    const g = ctx.createLinearGradient(x, y, x, y + h);
-    g.addColorStop(0, "#4e3470");
-    g.addColorStop(0.38, "#2A1638");
-    g.addColorStop(1, "#140c1c");
-    ctx.fillStyle = g;
-    ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-    const sheen = ctx.createLinearGradient(x, y, x + w * 0.2, y + h * 0.55);
-    sheen.addColorStop(0, "rgba(243, 232, 212, 0.16)");
-    sheen.addColorStop(0.45, "rgba(243, 232, 212, 0.03)");
-    sheen.addColorStop(1, "rgba(0, 0, 0, 0.28)");
-    ctx.fillStyle = sheen;
-    ctx.fillRect(x, y, w, h);
-    ctx.save();
-    ctx.globalCompositeOperation = "soft-light";
-    ctx.globalAlpha = 0.14;
-    ctx.fillStyle = grainPattern(ctx);
-    ctx.fillRect(x, y, w, h);
-    ctx.restore();
   }
 
   /* Soft night pill. Cream at the top-left, shadow at the bottom-right. No screws. */
@@ -975,7 +925,7 @@
     ctx.shadowBlur = 6;
     ctx.shadowOffsetY = 2;
     pathRound(ctx, r.x, y, r.w, r.h, rad);
-    ctx.fillStyle = hot ? "rgba(26, 20, 32, 0.66)" : "rgba(26, 20, 32, 0.58)";
+    ctx.fillStyle = hot ? "rgba(26, 20, 32, 0.43)" : "rgba(26, 20, 32, 0.35)";
     ctx.fill();
     ctx.restore();
     pathRound(ctx, r.x, y, r.w, r.h, rad);
