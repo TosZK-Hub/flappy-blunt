@@ -27,20 +27,24 @@
     SPARK_MIN: 3,
     SPARK_MAX: 5,
 
-    /* Scroll ramps from the start speed to SCROLL_END across the first SCROLL_SCORE puffs. */
+    /* Score bands live in scrollSpeed / gapHeight / spacingFor. Scroll caps at 250. Gap floors at 128. */
     SCROLL_START: 165,
-    SCROLL_END: 245,
-    SCROLL_SCORE: 20,
-
-    /* Opening starts wide, reaches GAP_AT_SCORE at GAP_SCORE, and never goes under GAP_FLOOR. */
+    SCROLL_CAP: 250,
     GAP_START: 155,
-    GAP_AT_SCORE: 135,
-    GAP_SCORE: 25,
-    GAP_FLOOR: 125,
-
-    /* Fixed distance between gate pairs. First gate can touch the blunt after this delay. */
+    GAP_FLOOR: 128,
     PIPE_SPACING: 220,
     FIRST_PIPE_DELAY: 1.4,
+
+    /* Pattern packs after this score. Rise/fall step the gap center. Breath widens one gap. */
+    PATTERN_SCORE: 16,
+    PATTERN_STEP: 14,
+    BREATH_EXTRA: 12,
+    BOB_SCORE: 31,
+    BOB_AMP: 8,
+    BOB_HZ: 0.55,
+    BOB_WARN: 0.3,
+    NEAR_MISS: 6,
+    NEAR_MISS_CAP: 5,
 
     /* Death: freeze the scroll, play the beat, then a tap restarts. No menu. */
     DEATH_FREEZE: 0.15,
@@ -50,10 +54,6 @@
     PU_NUG_BONUS: 2,
     PU_HAZE_TIME: 6,
     PU_HAZE_MULT: 2,
-    PU_ROCKET_TIME: 4,
-    PU_ROCKET_MULT: 1.25,
-    PU_FLOAT_TIME: 5,
-    PU_FLOAT_GRAVITY: 0.7,
     PU_TRAIL_TIME: 8,
     PU_IFRAME: 0.4,
     /* First pickup is the gap after the third pipe. Later ones are 4, 5, or 6 pipes apart. */
@@ -75,6 +75,7 @@
     WRAP_SHADOW: "#8A6A42",
     KRAFT_SHADOW: "#8A6A42",
     KRAFT_HIGH: "#E2C99A",
+    KRAFT_DEEP: "#5C4528",
     CREAM: "#F3E8D4",
     EMBER: "#E8A84A",
     HOT: "#FF6B2C",
@@ -102,8 +103,6 @@
   const PICKUPS = [
     { id: "nug_24k", name: "24K Nug", blurb: "+2 next" },
     { id: "nug_haze", name: "Purple Haze", blurb: "×2 · 6s" },
-    { id: "dab_rocket", name: "Dab Rocket", blurb: "scroll · 4s" },
-    { id: "magic_gummies", name: "Gummies", blurb: "float · 5s" },
     { id: "gold_chip", name: "Gold Chip", blurb: "1 hit" },
     { id: "trail_can", name: "Trail Can", blurb: "trail · 8s" },
   ];
@@ -129,20 +128,91 @@
     return (-deg * Math.PI) / 180;
   }
 
+  /* Knots are the value at that score. In-between scores ease from the previous knot. */
+  const SCROLL_BANDS = [
+    { at: 0, v: 165 },
+    { at: 5, v: 165 },
+    { at: 15, v: 195 },
+    { at: 30, v: 225 },
+    { at: 50, v: 245 },
+    { at: 51, v: 250 },
+  ];
+  const GAP_BANDS = [
+    { at: 0, v: 155 },
+    { at: 5, v: 155 },
+    { at: 15, v: 148 },
+    { at: 30, v: 140 },
+    { at: 50, v: 135 },
+    { at: 51, v: 128 },
+  ];
+  const SPACE_BANDS = [
+    { at: 0, v: 220 },
+    { at: 15, v: 220 },
+    { at: 30, v: 210 },
+    { at: 50, v: 205 },
+    { at: 51, v: 200 },
+  ];
+  const PATTERNS = ["straight", "rise", "fall", "breath"];
+
+  function bandValue(score, bands) {
+    const s = score > 0 ? score : 0;
+    if (s <= bands[0].at) return bands[0].v;
+    for (let i = 1; i < bands.length; i++) {
+      const a = bands[i - 1];
+      const b = bands[i];
+      if (s <= b.at) {
+        const t = (s - a.at) / (b.at - a.at);
+        return a.v + (b.v - a.v) * t;
+      }
+    }
+    return bands[bands.length - 1].v;
+  }
+
   function scrollSpeed(score) {
-    const t = clamp(score, 0, CONFIG.SCROLL_SCORE) / CONFIG.SCROLL_SCORE;
-    return CONFIG.SCROLL_START + (CONFIG.SCROLL_END - CONFIG.SCROLL_START) * t;
+    return Math.min(CONFIG.SCROLL_CAP, bandValue(score, SCROLL_BANDS));
   }
 
   function gapHeight(score) {
-    const span = CONFIG.GAP_SCORE;
-    const t = clamp(score, 0, span) / span;
-    let gap = CONFIG.GAP_START + (CONFIG.GAP_AT_SCORE - CONFIG.GAP_START) * t;
-    if (score > span) {
-      const slope = (CONFIG.GAP_START - CONFIG.GAP_AT_SCORE) / span;
-      gap = CONFIG.GAP_AT_SCORE - (score - span) * slope;
-    }
-    return Math.max(CONFIG.GAP_FLOOR, gap);
+    return Math.max(CONFIG.GAP_FLOOR, bandValue(score, GAP_BANDS));
+  }
+
+  function spacingFor(score) {
+    return bandValue(score, SPACE_BANDS);
+  }
+
+  function patternTurn(seed) {
+    const n = (seed || 0) % 4;
+    return n < 0 ? n + 4 : n;
+  }
+
+  function patternAt(pairIndex, seed) {
+    const pack = (Math.floor(pairIndex / 4) + patternTurn(seed)) % 4;
+    return PATTERNS[pack];
+  }
+
+  /* One pattern slot in four bobs. Same slot every run for a given seed. */
+  function packBobs(score, pairIndex, seed) {
+    if (score < CONFIG.BOB_SCORE) return false;
+    const pack = (Math.floor(pairIndex / 4) + patternTurn(seed)) % 4;
+    return pack === 1;
+  }
+
+  /* Draw-scale only. Squash peak is sx 0.88 / sy 1.12 for the whole 70–90ms window. */
+  function flapDraw(age) {
+    const ms = (age || 0) * 1000;
+    if (ms < 40) return { sx: 1.02, sy: 0.98, wing: -0.55 };
+    if (ms < 70) return { sx: 0.95, sy: 1.05, wing: -0.12 };
+    if (ms < 90) return { sx: 0.88, sy: 1.12, wing: 0.55 };
+    if (ms < 140) return { sx: 0.94, sy: 1.06, wing: 0.2 };
+    if (ms < 200) return { sx: 0.98, sy: 1.02, wing: 0.06 };
+    return { sx: 1, sy: 1, wing: 0 };
+  }
+
+  function heistRank(best) {
+    if (best >= 50) return "Legend";
+    if (best >= 25) return "Crew";
+    if (best >= 10) return "Runner";
+    return "";
   }
 
   return {
@@ -153,6 +223,11 @@
     clamp: clamp,
     scrollSpeed: scrollSpeed,
     gapHeight: gapHeight,
+    spacingFor: spacingFor,
+    patternAt: patternAt,
+    packBobs: packBobs,
+    flapDraw: flapDraw,
+    heistRank: heistRank,
     bodyDraw: bodyDraw,
     tipRadians: tipRadians,
   };
