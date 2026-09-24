@@ -1093,8 +1093,9 @@
       const owned = ui.owns(card.id);
       const equipped = ui.skin === card.id;
       const hot = card.id === ui.hover || card.id === ui.focus;
-      const amp = ui.reduceMotion ? 1.5 : 4.5;
-      const bob = hot ? Math.sin((ui.time || 0) * 5.5) * amp : 0;
+      const phase = Math.sin((ui.time || 0) * 4.2);
+      const bob = hot ? phase * (ui.reduceMotion ? 2 : 9) : 0;
+      const tilt = hot && !ui.reduceMotion ? phase * 0.1 : 0;
       paintTag(ctx, card.x, card.y, card.w, card.h);
       ctx.save();
       pathRound(ctx, card.x + 6, card.y + 8, card.w - 12, 78, 6);
@@ -1104,6 +1105,7 @@
       if (!owned) ctx.globalAlpha = 0.4;
       ctx.save();
       ctx.translate(card.x + card.w / 2, card.y + 50 + bob);
+      ctx.rotate(tilt);
       ctx.scale(0.36, 0.36);
       drawBlunt(ctx, card.id, {});
       ctx.restore();
