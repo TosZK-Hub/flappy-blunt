@@ -28,7 +28,7 @@ Add to Home Screen uses `manifest.webmanifest`, `sw.js`, and the icons in `asset
 
 **PLAY** is the gold button. Under it, cream type says “Tap / Space to flap.” The first cold open also whispers “Clear the grinders.” That line leaves after the first **PLAY** and does not come back.
 
-Only the gold **PLAY** rectangle starts a run, along with Space or Arrow Up. A tap on the Wanted slab, the blunt, the best-score chip, or the night behind the plate stays on the menu.
+Only the gold **PLAY** rectangle starts a run, along with Space or Arrow Up. A tap on the Wanted slab, the blunt, the best-score line, the heist rank, the collection strip, or the night behind the plate stays on the menu. The collection strip opens the shop.
 
 In the air, the same press flaps. A held key does nothing extra.
 
@@ -36,7 +36,7 @@ After a crash the grove freezes, then the death card comes up:
 
 - **HOME** (top-left ghost chip) returns to the menu and does not restart.
 - **JOBS** and **SHOP** (top-right ghost chips) open those panels and do not start a run.
-- **RESTART** is the gold button. A tap on the card away from those chips starts the next run.
+- **RESTART** is the only gold control. A tap elsewhere on the card does not start the next run. Space or Arrow Up still does.
 
 **JOBS** and **SHOP** are equal ghost chips under **PLAY** on the home menu. They do not start a run.
 
@@ -48,7 +48,7 @@ After a crash the grove freezes, then the death card comes up:
 
 ## Local-only history
 
-Best score, nugs, jobs, claimed rewards, mute, clean mode, and the equipped skin stay in this browser (`localStorage`). Nothing is uploaded. Clearing site data resets them. A new device starts at zero.
+Best score, nugs, the daily streak, jobs, claimed rewards, mute, clean mode, and the equipped skin stay in this browser (`localStorage`). Nothing is uploaded. Clearing site data resets them. A new device starts at zero.
 
 The public repo is [github.com/TosZK-Hub/flappy-blunt](https://github.com/TosZK-Hub/flappy-blunt). The same files are the GitHub Pages site.
 
@@ -69,6 +69,9 @@ Three free beats, once each, on this device. No XP bar, no battle pass, no ad ga
 - The first time you clear 5 pipes, a cream whisper lands with 25 nugs.
 - When your best reaches 15, a toast says “Heist warming up”.
 - Own two or more skins and the home blunt wears a gold ring. It marks the equipped skin. It is not a paywall.
+- The first run on a new calendar day banks +10 nugs. Consecutive days raise a streak that caps at 7 and resets if a day is missed. One toast on the home menu says so.
+- Best score wears a cosmetic title under the best line: 10 Runner, 25 Crew, 50 Legend. No paywall.
+- A near-miss (the 34×24 box clears a lip by 6px or less) sparks +1 nug, up to 5 a run. It does not change the score or the flap.
 
 ## Clean mode and pickups
 
@@ -76,20 +79,22 @@ Between the gates, one pickup can be live at a time. A new one replaces the old.
 
 - **24K Nug** — the next pipe exit pays +2, once.
 - **Purple Haze** — score ×2 for 6 seconds.
-- **Dab Rocket** — scroll ×1.25 for 4 seconds.
-- **Gummies** — gravity ×0.7 for 5 seconds.
 - **Gold Chip** — one hit. The gold hex pops off, then 0.4s of i-frames.
 - **Trail Can** — rainbow trail for 8 seconds. No gameplay change.
 
-When a timer ends, gravity, flap, and scroll snap back in the same step. **CLEAN** spawns nothing.
+There is no Dab Rocket, no Magic Gummies, no revive, and no gravity change mid-run. When a timer ends, flap and scroll snap back in the same step. **CLEAN** spawns nothing.
 
 ## Feel lock
 
 All of the tuned numbers live in `js/feel.js` as `CONFIG`. Physics and the death beat read that object. Do not copy them elsewhere, and do not retune them for launch.
 
-A puff **sets** upward speed (`FLAP_IMPULSE` −440) and a held key does nothing. Gravity is 1450. The fall cap is 540. The hitbox is a 34×24 box, inset in the drawn blunt. Scroll starts at 165 px/s and reaches 245 by 20 puffs. Gate gaps start at 155 px, ease toward 135 by 25, and never go under 125. Pairs sit 220 px apart. The first gate can touch you 1.4 s after the run starts.
+A puff **sets** upward speed (`FLAP_IMPULSE` −440) and a held key does nothing. Gravity is 1450. The fall cap is 540. The hitbox is a 34×24 box, inset in the drawn blunt. Do not retune those three physics numbers without a Feel note.
 
-On a crash the grove freezes for 0.15 s, a death-juice flash lasts 0.08 s, the card waits 0.4 s, then one tap starts the next run. You score +1 when you cross a gate's center line. A flap tips the blunt up 12° and throws 3–5 sparks. Falling settles the tip to −8°, then the wrap goes ash. Flaps and scores do not shake the camera. On a crash the world settles at most 4 px for 120 ms, then holds still.
+Scroll and gaps follow score bands. Teach (0–5) holds 165 px/s, a 155 px gap, and 220 px spacing. Warm eases toward 195 / 148 by score 15. Heist eases toward 225 / 140 and 210 px spacing by 30. Heat eases toward 245 / 135 and 205 px by 50. Legend (51+) is 250 px/s, a 128 px gap floor, and 200 px spacing. Scroll never exceeds 250. The gap never goes under 128, and a pair does not shrink after it spawns. The first gate can touch you 1.4 s after the run starts.
+
+From score 16, pairs cycle in packs of four: straight, rise (+14 px), fall (−14 px), breath (one gap +12 px tall, then the band gap again). From score 31, one pack in four bobs ±8 px at 0.55 Hz, both lips together, with an amber lip pulse for 0.3 s before that pair enters. Scores 15, 30, and 50 flash “Heat up” for 0.4 s.
+
+On a crash the grove freezes for 0.15 s, a white flash lasts at most 0.08 s, the card waits 0.4 s, then the gold **RESTART** button starts the next run. You score +1 when you cross a gate's center line. A flap squashes the draw to 0.88× / 1.12y for the 70–90 ms window, then settles by 200 ms. That scale does not move the hitbox. The tip goes up 12° and throws 3–5 sparks. Falling settles the tip to −8°, then the wrap goes ash. Flaps and scores do not shake the camera. On a crash the world settles at most 4 px for 120 ms, then holds still. Trail puffs stay at or under 35% opacity.
 
 ## Layout
 
@@ -100,7 +105,8 @@ On a crash the grove freezes for 0.15 s, a death-juice flash lasts 0.08 s, the c
 - `js/feel.js` — `CONFIG`, palette, skins, pickup timings
 - `js/physics.js` — simulation, reads `CONFIG`
 - `js/meta.js` — nugs, 24h jobs, skin shop
-- `js/render.js` — winged blunt, grinders, Wanted slab, Night Heist panels
+- `js/render.js` — volumetric winged blunt, grinders, Wanted slab, Night Heist panels
+- `art/total-upgrade/` — 3D-feel turnaround, flap sheet, and in-scene scale ref (canvas, no WebGL)
 - `js/audio.js` — synthesized puff / chime / thud
 - `js/game.js` — home menu, play, game over
 - `assets/` — fonts, splash, and app icons (180, 192, 512, 1024)

@@ -39,6 +39,9 @@
       pipe5: false,
       heist15: false,
       fullCrew: false,
+      lastPlay: "",
+      streak: 0,
+      streakToast: false,
       claimed: {},
     };
   }
@@ -81,6 +84,9 @@
           if (parsed.pipe5) state.pipe5 = true;
           if (parsed.heist15) state.heist15 = true;
           if (parsed.fullCrew) state.fullCrew = true;
+          if (typeof parsed.lastPlay === "string") state.lastPlay = parsed.lastPlay;
+          if (Number.isFinite(parsed.streak) && parsed.streak > 0) state.streak = Math.min(7, Math.floor(parsed.streak));
+          if (parsed.streakToast) state.streakToast = true;
           if (parsed.claimed && typeof parsed.claimed === "object") state.claimed = parsed.claimed;
         }
       } catch (e) {
@@ -127,6 +133,47 @@
       if (ids.length < 5) return false;
       for (let i = 0; i < ids.length; i++) if (!owns(ids[i])) return false;
       return true;
+    }
+
+    function pad2(n) {
+      return n < 10 ? "0" + n : String(n);
+    }
+
+    function dayKey(t) {
+      const d = new Date(t);
+      return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+    }
+
+    function prevDayKey(key) {
+      const parts = key.split("-");
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      d.setDate(d.getDate() - 1);
+      return dayKey(d.getTime());
+    }
+
+    function notePlay() {
+      refresh();
+      const today = dayKey(now());
+      if (state.lastPlay === today) return 0;
+      if (state.lastPlay && prevDayKey(today) === state.lastPlay) {
+        state.streak = Math.min(7, (state.streak || 0) + 1);
+      } else {
+        state.streak = 1;
+      }
+      state.lastPlay = today;
+      state.nugs += 10;
+      state.streakToast = true;
+      save();
+      return state.streak;
+    }
+
+    function takeStreakToast() {
+      refresh();
+      if (!state.streakToast) return null;
+      const info = { streak: state.streak, nugs: 10 };
+      state.streakToast = false;
+      save();
+      return info;
     }
 
     function grantFullCrew() {
@@ -230,6 +277,8 @@
         if (n) save();
         return n;
       },
+      notePlay: notePlay,
+      takeStreakToast: takeStreakToast,
     };
   }
 

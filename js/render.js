@@ -128,7 +128,7 @@
   }
 
   /* Metal grinder discs. Dual cream speculars. Neon hairline only on the gap face. */
-  function drawGrinder(ctx, tower, faceY, farY) {
+  function drawGrinder(ctx, tower, faceY, farY, warn, time) {
     const bodyW = P.COL_W;
     const left = tower.x + (P.VIS_W - bodyW) / 2;
     const lipIsBottom = faceY >= farY;
@@ -203,15 +203,30 @@
     ctx.moveTo(capX + 6, hy);
     ctx.lineTo(capX + capW - 6, hy);
     ctx.stroke();
+    if (warn) {
+      const pulse = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin((time || 0) * 16));
+      ctx.strokeStyle = "rgba(232, 168, 74, " + (0.9 * pulse).toFixed(3) + ")";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(capX + 6, hy);
+      ctx.lineTo(capX + capW - 6, hy);
+      ctx.stroke();
+    }
   }
 
-  function drawTowers(ctx, towers) {
+  function drawTowers(ctx, towers, time, speed) {
+    const spd = speed > 0 ? speed : 180;
     for (let i = 0; i < towers.length; i++) {
       const t = towers[i];
       const gapTop = t.gapY - t.gapH / 2;
       const gapBot = t.gapY + t.gapH / 2;
-      drawGrinder(ctx, t, gapTop, -40);
-      drawGrinder(ctx, t, gapBot, P.GROUND_Y + 8);
+      let warn = false;
+      if (t.bob) {
+        const lead = (t.x - P.W) / spd;
+        warn = lead <= 0.3 && t.x > P.W - 36;
+      }
+      drawGrinder(ctx, t, gapTop, -40, warn, time);
+      drawGrinder(ctx, t, gapBot, P.GROUND_Y + 8, warn, time);
     }
   }
 
@@ -272,10 +287,8 @@
     ctx.stroke();
   }
 
-  /* Soft arcade feathers: cream core, 10% halo, vein only on the inner three. */
-  function featherWing(ctx, fill, tip) {
-    ctx.save();
-    ctx.translate(-8, -6);
+  /* Five feathers. Soft edge a0.22. Vein a≤0.28 on the inner three only. */
+  function drawFeathers(ctx, fill, tip) {
     for (let i = 0; i < 5; i++) {
       ctx.save();
       ctx.rotate(-1.05 + i * 0.34);
@@ -303,34 +316,47 @@
       }
       ctx.restore();
     }
+  }
+
+  /* Both sides of one depth layer. ox is the 2.5D parallax (±2–3px). */
+  function drawWingLayer(ctx, fill, tip, ang, alpha, ox) {
+    ctx.save();
+    ctx.translate(ox, 0);
+    ctx.globalAlpha *= alpha;
+    ctx.save();
+    ctx.translate(-8, -6);
+    ctx.rotate(ang || 0);
+    drawFeathers(ctx, fill, tip);
+    ctx.restore();
+    ctx.save();
+    ctx.scale(1, -1);
+    ctx.translate(-8, -6);
+    ctx.rotate(ang || 0);
+    drawFeathers(ctx, fill, tip);
+    ctx.restore();
     ctx.restore();
   }
 
-  /* Five-stop kraft cylinder, clipped to the blunt. No stacked wrap rects. */
+  function wrapStops(id, ash) {
+    if (ash) return ["#C4C0C6", "#9A949C", "#6B6570", "#4A4550", "#2A262E"];
+    if (id === "galaxy_roll") return ["#8A6BE0", "#6C4BD6", "#24143F", "#12081F", "#07040E"];
+    if (id === "gold_chain") return ["#F3D7A0", "#E2C07A", "#C9A15A", "#8A6230", "#5C4018"];
+    if (id === "og_heist") return ["#E2C99A", "#C4A574", "#A68458", "#6E5230", "#3E2C18"];
+    return [Pal.KRAFT_HIGH, "#D4B888", Pal.KRAFT, Pal.KRAFT_SHADOW, Pal.KRAFT_DEEP || "#5C4528"];
+  }
+
+  /* Volumetric cylinder clipped to bluntPath. Gradient fill, not stacked wrap rects. */
   function paintBluntBody(ctx, L, r0, r1, ash, id) {
     ctx.save();
     bluntPath(ctx, L, r0, r1);
     ctx.clip();
+    const stops = wrapStops(id, ash);
     const g = ctx.createLinearGradient(0, -r0, 0, r0);
-    if (ash) {
-      g.addColorStop(0, "#C4C0C6");
-      g.addColorStop(0.18, "#9A949C");
-      g.addColorStop(0.45, Pal.ASH);
-      g.addColorStop(0.72, "#4A4550");
-      g.addColorStop(1, "#2A262E");
-    } else if (id === "galaxy_roll") {
-      g.addColorStop(0, "#8A6BE0");
-      g.addColorStop(0.18, "#6C4BD6");
-      g.addColorStop(0.45, "#24143F");
-      g.addColorStop(0.72, "#12081F");
-      g.addColorStop(1, "#07040E");
-    } else {
-      g.addColorStop(0, Pal.KRAFT_HIGH);
-      g.addColorStop(0.18, "#D4B888");
-      g.addColorStop(0.45, Pal.KRAFT);
-      g.addColorStop(0.72, Pal.KRAFT_SHADOW);
-      g.addColorStop(1, "#5C4528");
-    }
+    g.addColorStop(0, stops[0]);
+    g.addColorStop(0.18, stops[1]);
+    g.addColorStop(0.45, stops[2]);
+    g.addColorStop(0.72, stops[3]);
+    g.addColorStop(1, stops[4]);
     ctx.fillStyle = g;
     ctx.fillRect(-L, -r0 - 4, L * 2, (r0 + 4) * 2);
     if (!ash && id === "galaxy_roll") {
@@ -342,20 +368,29 @@
         ctx.fill();
       }
     }
-    if (!ash && id !== "galaxy_roll") {
-      ctx.fillStyle = "rgba(243, 232, 212, 0.32)";
-      ctx.beginPath();
-      ctx.ellipse(-2, -6.6, 18, 3.8, -0.06, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "rgba(26, 20, 32, 0.18)";
-      ctx.beginPath();
-      ctx.ellipse(0, 9.2, 16, 3.2, 0.05, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = "multiply";
-      ctx.globalAlpha = 0.04;
-      ctx.fillStyle = grainPattern(ctx);
-      ctx.fillRect(-L, -r0 - 4, L * 2, (r0 + 4) * 2);
-    }
+    const rim = ctx.createLinearGradient(0, -r0, 0, -r0 * 0.15);
+    rim.addColorStop(0, "rgba(243, 232, 212, 0.45)");
+    rim.addColorStop(1, "rgba(243, 232, 212, 0)");
+    ctx.fillStyle = rim;
+    ctx.fillRect(-L, -r0 - 2, L * 2, r0);
+    ctx.fillStyle = "rgba(243, 232, 212, 0.32)";
+    ctx.beginPath();
+    ctx.ellipse(-2, -6.2, 18, 3.6, -0.05, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(26, 20, 32, 0.18)";
+    ctx.beginPath();
+    ctx.ellipse(0, r0 * 0.55, 16, 3.2, 0.04, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.globalAlpha = 0.04;
+    ctx.fillStyle = grainPattern(ctx);
+    ctx.fillRect(-L, -r0 - 4, L * 2, (r0 + 4) * 2);
+    ctx.restore();
+    ctx.fillStyle = "rgba(243, 232, 212, 0.28)";
+    ctx.beginPath();
+    ctx.ellipse(-6, -7.6, 17, 1.05, -0.1, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 
@@ -380,26 +415,32 @@
       wing = "#E7E2D6";
     }
 
-    ctx.save();
-    if (!ash && id === "neon_kush") {
-      ctx.shadowColor = "rgba(46, 230, 214, 0.15)";
-      ctx.shadowBlur = 8;
-    } else if (!ash && id === "galaxy_roll") {
-      ctx.shadowColor = "rgba(180, 76, 255, 0.15)";
-      ctx.shadowBlur = 8;
-    }
+    const t = o.time != null ? o.time : chromeTime;
+    let ang = o.wing || 0;
+    if (!ash && !o.flapping && !reduceChrome) ang += Math.sin(t * 2.15) * 0.12;
+    if (ash && !o.wing) ang = 0.4;
 
     ctx.save();
-    ctx.scale(1, -1);
-    featherWing(ctx, wing, wingTip);
-    ctx.restore();
-    ctx.shadowBlur = 0;
+    drawWingLayer(ctx, wing, wingTip, ang, 0.72, -3);
+
+    ctx.fillStyle = "rgba(26, 20, 32, 0.28)";
+    ctx.beginPath();
+    ctx.ellipse(0, r0 + 2.5, L * 0.34, 4.4, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     paintBluntBody(ctx, L, r0, r1, ash, id);
+    if (!ash && id === "neon_kush") {
+      ctx.shadowColor = "rgba(46, 230, 214, 0.35)";
+      ctx.shadowBlur = 6;
+    } else if (!ash && id === "galaxy_roll") {
+      ctx.shadowColor = "rgba(180, 76, 255, 0.22)";
+      ctx.shadowBlur = 6;
+    }
     bluntPath(ctx, L, r0, r1);
     ctx.lineWidth = !ash && id === "neon_kush" ? 2.4 : 2;
     ctx.strokeStyle = !ash && id === "neon_kush" ? Pal.NEON : Pal.NIGHT_INK;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     if (!ash && id === "default") {
       ctx.fillStyle = "#6D3FA8";
@@ -477,10 +518,9 @@
       pathRound(ctx, 2, 3.2, 2.4, 2.6, 1);
       ctx.fill();
     }
-    featherWing(ctx, wing, wingTip);
+    drawWingLayer(ctx, wing, wingTip, ang, 1, 2);
     if (!ash) {
       const tipX = L / 2 - 4;
-      const t = o.time != null ? o.time : chromeTime;
       const wave = Math.sin(t * 6.5);
       let pulse = 0.92 + 0.08 * wave;
       const glowA = 0.12 + 0.03 * wave;
@@ -533,14 +573,25 @@
     ctx.restore();
   }
 
-  function drawPlayer(ctx, p) {
+  function drawPlayer(ctx, p, time) {
+    const t = time || chromeTime;
+    const flapping = p.flapAge != null && p.flapAge >= 0 && p.flapAge < 0.2;
+    const bob = reduceChrome || p.dead || p.ash || flapping ? 0 : Math.sin(t * 2.15) * 6.5;
     ctx.save();
-    ctx.translate(P.PLAYER_X, p.y);
+    ctx.translate(P.PLAYER_X, p.y + bob);
     ctx.rotate(p.rot || 0);
     if (p.shield) drawShieldRing(ctx);
     ctx.save();
-    ctx.scale(p.sx || 1, p.sy || 1);
-    drawBlunt(ctx, p.skin || "default", { ash: p.ash, emberKick: p.emberKick });
+    const sx = reduceChrome ? 1 : p.sx || 1;
+    const sy = reduceChrome ? 1 : p.sy || 1;
+    ctx.scale(sx, sy);
+    drawBlunt(ctx, p.skin || "default", {
+      ash: p.ash,
+      emberKick: p.emberKick,
+      time: t,
+      wing: reduceChrome ? 0 : p.wing || 0,
+      flapping: flapping && !reduceChrome,
+    });
     ctx.restore();
     ctx.restore();
   }
@@ -569,36 +620,6 @@
       ctx.lineTo(6, -6);
       ctx.closePath();
       ctx.fill();
-      ctx.stroke();
-    } else if (pk.id === "dab_rocket") {
-      ctx.fillStyle = "#C5CDD6";
-      ctx.fillRect(-12, -5, 22, 10);
-      ctx.fillStyle = "#8E99A6";
-      ctx.beginPath();
-      ctx.moveTo(10, -5);
-      ctx.lineTo(18, 0);
-      ctx.lineTo(10, 5);
-      ctx.fill();
-      ctx.fillStyle = Pal.HOT;
-      ctx.beginPath();
-      ctx.moveTo(-12, -4);
-      ctx.lineTo(-22, 0);
-      ctx.lineTo(-12, 4);
-      ctx.fill();
-      ctx.strokeStyle = Pal.INK;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(-12, -5, 22, 10);
-    } else if (pk.id === "magic_gummies") {
-      ctx.fillStyle = "#FF5A6A";
-      pathRound(ctx, -14, -8, 12, 16, 5);
-      ctx.fill();
-      ctx.fillStyle = "#C47A3A";
-      pathRound(ctx, 2, -8, 12, 16, 5);
-      ctx.fill();
-      ctx.strokeStyle = Pal.CYAN;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 18, 12, 0, 0, Math.PI * 2);
       ctx.stroke();
     } else if (pk.id === "gold_chip") {
       ctx.fillStyle = "#D7DEE8";
@@ -647,10 +668,12 @@
   let grainPat = null;
   let chromeTime = 0;
   let pressedPt = null;
+  let reduceChrome = false;
 
-  function setChrome(t, pt) {
+  function setChrome(t, pt, reduce) {
     chromeTime = t || 0;
     pressedPt = pt || null;
+    reduceChrome = !!reduce;
   }
 
   function hitRect(pt, r) {
@@ -1041,6 +1064,10 @@
     return hitRect(pt, homeLayout().play);
   }
 
+  function restartHit(pt) {
+    return hitRect(pt, deathLayout().restart);
+  }
+
   function deathLayout() {
     const panel = { x: 22, y: 156, w: 376, h: 448 };
     const restart = {
@@ -1363,8 +1390,6 @@
     const labels = {
       nug_24k: "+2 NEXT",
       nug_haze: "×2",
-      dab_rocket: "BOOST",
-      magic_gummies: "FLOAT",
       gold_chip: "SHIELD",
       trail_can: "TRAIL",
     };
@@ -1560,6 +1585,13 @@
     ctx.fillStyle = Pal.CREAM;
     ctx.globalAlpha = 0.92;
     ctx.fillText("best  " + (best || 0), cx, yB);
+    const rank = Feel.heistRank(best || 0);
+    if (rank) {
+      ctx.font = "13px " + FONT;
+      ctx.fillStyle = Pal.GOLD;
+      ctx.globalAlpha = 0.95;
+      ctx.fillText(rank, cx, yB + 16);
+    }
     ctx.restore();
   }
 
@@ -1570,10 +1602,10 @@
     paintPlate(ctx, home.plate.x, home.plate.y, home.plate.w, home.plate.h, 22);
 
     drawWantedMark(ctx, ui.best);
-    stamp(ctx, "One flap. Chill heist energy.", P.W / 2, 214, 13, Pal.CREAM);
+    stamp(ctx, "One flap. Chill heist energy.", P.W / 2, 220, 13, Pal.CREAM);
     drawCollection(ctx, ui);
 
-    const bob = Math.sin((ui.time || 0) * 2.15) * 7;
+    const bob = reduceChrome ? 0 : Math.sin((ui.time || 0) * 2.15) * 6.5;
     if (ui.equippedRing) {
       ctx.save();
       ctx.translate(P.W / 2, 336 + bob);
@@ -1589,7 +1621,7 @@
     ctx.translate(P.W / 2, 336 + bob);
     ctx.rotate(ui.rot || 0);
     ctx.scale(1.22, 1.22);
-    drawBlunt(ctx, ui.skin || "default", {});
+    drawBlunt(ctx, ui.skin || "default", { time: ui.time || 0 });
     ctx.restore();
 
     const play = home.play;
@@ -1673,6 +1705,25 @@
     if (amount <= 0) return;
     ctx.fillStyle = "rgba(255, 255, 255, " + (amount * 0.82).toFixed(3) + ")";
     ctx.fillRect(0, 0, P.W, P.H);
+  }
+
+  /* Thin amber rim. Stays off the gap. */
+  function drawEdgeFlash(ctx, amount) {
+    if (amount <= 0) return;
+    const a = Math.min(1, amount) * 0.55;
+    const edge = 16;
+    ctx.save();
+    const left = ctx.createLinearGradient(0, 0, edge, 0);
+    left.addColorStop(0, "rgba(232, 168, 74, " + a.toFixed(3) + ")");
+    left.addColorStop(1, "rgba(232, 168, 74, 0)");
+    ctx.fillStyle = left;
+    ctx.fillRect(0, 0, edge, P.H);
+    const right = ctx.createLinearGradient(P.W, 0, P.W - edge, 0);
+    right.addColorStop(0, "rgba(232, 168, 74, " + a.toFixed(3) + ")");
+    right.addColorStop(1, "rgba(232, 168, 74, 0)");
+    ctx.fillStyle = right;
+    ctx.fillRect(P.W - edge, 0, edge, P.H);
+    ctx.restore();
   }
 
   function drawVignette(ctx) {
@@ -1763,6 +1814,7 @@
     drawMenu,
     menuHit,
     playHit,
+    restartHit,
     collectionHit,
     stashHit,
     drawNugs,
@@ -1781,6 +1833,7 @@
     drawHint,
     drawGameOver,
     drawFlash,
+    drawEdgeFlash,
     drawWhite,
     drawVignette,
     drawMute,

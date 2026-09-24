@@ -23,7 +23,8 @@
   const START_Y = 318;
   const CEILING = 16;
 
-  const SPAWN_AT = W + 28;
+  /* Far enough off the right edge that a bob pair can telegraph for 0.3s before it enters. */
+  const SPAWN_AT = W + 96;
   const VIS_W = 108;
   const COL_W = 74;
 
@@ -47,8 +48,14 @@
     };
   }
 
-  function spacingFor() {
-    return C.PIPE_SPACING;
+  function spacingFor(score) {
+    return Feel.spacingFor(score || 0);
+  }
+
+  function gapLimits(gapH) {
+    const min = 102 + gapH / 2;
+    const max = GROUND_Y - 92 - gapH / 2;
+    return { min: min, max: max > min ? max : min };
   }
 
   function gateInset() {
@@ -128,6 +135,7 @@
       sx: 1,
       sy: 1,
       wing: 0,
+      flapAge: null,
       spin: 0,
       dead: false,
       invuln: 0,
@@ -137,8 +145,7 @@
   function stepPlayer(p, dt, flap, dead, gravityScale) {
     if (flap && !dead) {
       p.vy = FLAP_IMPULSE;
-      p.sx = 1.08;
-      p.sy = 0.92;
+      p.flapAge = 0;
     }
     const g = GRAVITY * (gravityScale || 1);
     p.vy = Math.min(MAX_FALL, p.vy + g * dt);
@@ -164,17 +171,33 @@
       }
     }
 
-    const sk = 1 - Math.exp(-14 * dt);
-    p.sx += (1 - (p.sx || 1)) * sk;
-    p.sy += (1 - (p.sy || 1)) * sk;
-    p.wing = (p.wing || 0) * Math.exp(-8 * dt);
+    if (!dead) {
+      if (p.flapAge != null) {
+        const pose = Feel.flapDraw(p.flapAge);
+        p.sx = pose.sx;
+        p.sy = pose.sy;
+        p.wing = pose.wing;
+        p.flapAge += dt;
+        if (p.flapAge >= 0.2) {
+          p.flapAge = null;
+          p.sx = 1;
+          p.sy = 1;
+          p.wing = 0;
+        }
+      } else {
+        p.sx = 1;
+        p.sy = 1;
+        p.wing = 0;
+      }
+    }
     return p;
   }
 
-  const PICKUP_IDS = ["nug_24k", "nug_haze", "dab_rocket", "magic_gummies", "gold_chip", "trail_can"];
+  const PICKUP_IDS = ["nug_24k", "nug_haze", "gold_chip", "trail_can"];
 
   function createRun(seed, opts) {
-    const rng = mulberry32(seed == null ? (Math.random() * 0xffffffff) >>> 0 : seed >>> 0);
+    const resolved = seed == null ? (Math.random() * 0xffffffff) >>> 0 : seed >>> 0;
+    const rng = mulberry32(resolved);
     const gapH = gapHeight(0);
     return {
       score: 0,
@@ -188,6 +211,9 @@
       spawned: false,
       player: createPlayer(),
       rng,
+      seed: resolved,
+      patternPairs: 0,
+      skim: 0,
       gapY: START_Y - 18,
       gapH,
       time: 0,
@@ -199,10 +225,9 @@
     const active = { id: id, until: 0, armed: false, popping: false };
     if (id === "nug_24k") active.armed = true;
     else if (id === "nug_haze") active.until = t + C.PU_HAZE_TIME;
-    else if (id === "dab_rocket") active.until = t + C.PU_ROCKET_TIME;
-    else if (id === "magic_gummies") active.until = t + C.PU_FLOAT_TIME;
     else if (id === "gold_chip") active.held = true;
     else if (id === "trail_can") active.until = t + C.PU_TRAIL_TIME;
+    else return;
     run.active = active;
   }
 
@@ -222,19 +247,25 @@
   }
 
   function stepRun(run, dt, flap) {
-    const ev = { died: null, scored: false, gain: 0, gapX: 0, gapY: 0, flapped: false, pickups: [], blocked: null };
+    const ev = { died: null, scored: false, gain: 0, gapX: 0, gapY: 0, flapped: false, pickups: [], blocked: null, skim: false };
     if (!run.alive) return ev;
 
     if (run.player.invuln > 0) run.player.invuln -= dt;
     if (run.active && run.active.until && run.time >= run.active.until) run.active = null;
-    const floating = effectLive(run, "magic_gummies");
     if (flap) ev.flapped = true;
-    stepPlayer(run.player, dt, flap, false, floating ? C.PU_FLOAT_GRAVITY : 1);
+    stepPlayer(run.player, dt, flap, false, 1);
 
-    let speed = scrollSpeed(run.score);
-    if (effectLive(run, "dab_rocket")) speed *= C.PU_ROCKET_MULT;
+    const speed = scrollSpeed(run.score);
     run.nextX -= speed * dt;
-    for (let i = 0; i < run.towers.length; i++) run.towers[i].x -= speed * dt;
+    for (let i = 0; i < run.towers.length; i++) {
+      const t = run.towers[i];
+      t.x -= speed * dt;
+      if (t.bob) {
+        const bob = Math.sin(run.time * C.BOB_HZ * Math.PI * 2 + (t.phase || 0)) * C.BOB_AMP;
+        const lim = gapLimits(t.gapH);
+        t.gapY = clamp(t.baseGapY + bob, lim.min, lim.max);
+      }
+    }
     if (run.pickups) {
       for (let i = run.pickups.length - 1; i >= 0; i--) {
         run.pickups[i].x -= speed * dt;
@@ -244,18 +275,33 @@
 
     let guard = 0;
     while (run.nextX < SPAWN_AT && guard++ < 6) {
-      const gapH = gapHeight(run.score);
-      if (run.spawned) run.gapY = nextGapY(run.gapY, gapH, run.rng, run.score);
+      let gapH = gapHeight(run.score);
+      const pairIndex = run.patternPairs;
+      const patterned = run.score >= C.PATTERN_SCORE;
+      const pattern = patterned ? Feel.patternAt(pairIndex, run.seed) : "straight";
+      const bob = patterned && Feel.packBobs(run.score, pairIndex, run.seed);
+      if (pattern === "breath" && pairIndex % 4 === 0) gapH += C.BREATH_EXTRA;
+      let gapY = run.gapY;
+      if (run.spawned && pattern === "rise") gapY = run.gapY + C.PATTERN_STEP;
+      else if (run.spawned && pattern === "fall") gapY = run.gapY - C.PATTERN_STEP;
+      else if (run.spawned) gapY = nextGapY(run.gapY, gapH, run.rng, run.score);
+      const lim = gapLimits(gapH);
+      gapY = clamp(gapY, lim.min, lim.max);
+      run.gapY = gapY;
       run.spawned = true;
+      if (patterned) run.patternPairs += 1;
       const seed = (run.rng() * 0x7fffffff) | 0;
       const variant = (run.rng() * 3) | 0;
       const tower = {
         x: run.nextX,
-        gapY: run.gapY,
-        gapH,
+        gapY: gapY,
+        baseGapY: gapY,
+        gapH: gapH,
+        bob: !!bob,
+        phase: (Math.floor(pairIndex / 4) % 7) * 0.35,
         scored: false,
-        seed,
-        variant,
+        seed: seed,
+        variant: variant,
       };
       if (run.pickupsEnabled && run.towers.length >= 1 && run.towers.length + 1 === run.nextPickupPipe) {
         const prev = run.towers[run.towers.length - 1];
@@ -270,7 +316,7 @@
         run.nextPickupPipe += C.PU_GAP_MIN + ((run.rng() * span) | 0);
       }
       run.towers.push(tower);
-      run.nextX += spacingFor();
+      run.nextX += spacingFor(run.score);
     }
 
     const p = run.player;
@@ -291,6 +337,16 @@
         ev.gapX = cx;
         ev.gapY = t.gapY;
         ev.gapH = t.gapH;
+        const halfH = HITBOX_H / 2;
+        const topLip = t.gapY - t.gapH / 2;
+        const botLip = t.gapY + t.gapH / 2;
+        const clearTop = (p.y - halfH) - topLip;
+        const clearBot = botLip - (p.y + halfH);
+        const skimGap = clearTop < clearBot ? clearTop : clearBot;
+        if (skimGap >= 0 && skimGap <= C.NEAR_MISS && run.skim < C.NEAR_MISS_CAP) {
+          run.skim += 1;
+          ev.skim = true;
+        }
       }
     }
 
