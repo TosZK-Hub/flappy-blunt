@@ -1,9 +1,10 @@
-/* Flappy Blunt — title, flight, and a one-tap restart. */
+/* Flappy Blunt — one flap, township sunset, chest costumes. */
 (function () {
   "use strict";
 
   const P = window.FBPhysics;
   const C = window.FBFeel.CONFIG;
+  const Feel = window.FBFeel;
   const Draw = window.FBDraw;
   const Sfx = window.FBAudio;
   const Meta = window.FBMeta;
@@ -11,7 +12,6 @@
   const BEST_KEY = "flappyblunt.best";
   const MUTE_KEY = "flappyblunt.mute";
   const SKIN_KEY = "flappyblunt.skin";
-  const CLEAN_KEY = "flappyblunt.clean";
   const PLAYED_KEY = "flappyblunt.played";
   const STEP = 1 / 60;
 
@@ -25,13 +25,11 @@
   let state = TITLE;
   let run = null;
   let best = loadNum(BEST_KEY);
-  let bestAtRunStart = best;
   let newBest = false;
   let muted = loadMute();
   let flapQueued = false;
   let lock = 0;
   let deathFreeze = 0;
-  let shake = 0;
   let settle = 0;
   let settleLife = 0;
   let flash = 0;
@@ -41,17 +39,16 @@
   let scorePop = 1;
   let scoreFlip = 0;
   let skin = loadSkin();
-  let cleanRun = loadClean();
   let playedOnce = loadPlayed();
   let overlay = null;
+  let reveal = null;
   let banked = 0;
   let jobClaim = false;
-  let nugPopDur = 0.4;
-  let shopHover = null;
-  let shopFocus = skin;
-  let shopWhisper = 0;
-  let nugPop = 0;
+  let coinPopDur = 0.4;
+  let coinPop = 0;
+  let chestWhisper = 0;
   let jobsAtRun = null;
+  let skimFlash = null;
   const toasts = [];
   let showHitboxes = /(?:\?|&)hitbox=1(?:&|$)/.test(window.location.search);
   let reduceMotion = false;
@@ -69,11 +66,10 @@
   let pointer = null;
   let last = 0;
   let acc = 0;
-
   let layout = { vw: 1, vh: 1, dpr: 1, scale: 1, ox: 0, oy: 0, framed: false };
 
   Sfx.setMuted(muted);
-  if (!Meta.owns(skin)) setSkin("default");
+  if (!Meta.owns(skin)) setSkin("starter_tee");
 
   function loadNum(key) {
     try {
@@ -110,35 +106,16 @@
     }
   }
 
-  function loadClean() {
-    const q = window.location.search;
-    if (/(?:\?|&)clean=1(?:&|$)/.test(q)) return true;
-    if (/(?:\?|&)clean=0(?:&|$)/.test(q)) return false;
-    try {
-      return localStorage.getItem(CLEAN_KEY) === "1";
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function setClean(on) {
-    cleanRun = !!on;
-    try {
-      localStorage.setItem(CLEAN_KEY, cleanRun ? "1" : "0");
-    } catch (e) {
-      /* ignore */
-    }
-  }
-
   function loadSkin() {
     try {
       const id = localStorage.getItem(SKIN_KEY);
-      const skins = window.FBFeel.SKINS;
-      for (let i = 0; i < skins.length; i++) if (skins[i].id === id) return id;
+      if (id === "default") return "starter_tee";
+      const list = Feel.COSTUMES;
+      for (let i = 0; i < list.length; i++) if (list[i].id === id) return id;
     } catch (e) {
       /* ignore */
     }
-    return "default";
+    return "starter_tee";
   }
 
   function setSkin(id) {
@@ -152,11 +129,11 @@
   }
 
   function cycleSkin(dir) {
-    const skins = window.FBFeel.SKINS.filter(function (s) { return Meta.owns(s.id); });
-    if (!skins.length) return;
+    const list = Feel.COSTUMES.filter(function (s) { return Meta.owns(s.id); });
+    if (!list.length) return;
     let i = 0;
-    for (let k = 0; k < skins.length; k++) if (skins[k].id === skin) i = k;
-    setSkin(skins[(i + dir + skins.length) % skins.length].id);
+    for (let k = 0; k < list.length; k++) if (list[k].id === skin) i = k;
+    setSkin(list[(i + dir + list.length) % list.length].id);
   }
 
   function claimReady() {
@@ -202,50 +179,35 @@
     }
   }
 
-  function popNugs(seconds) {
+  function popCoins(seconds) {
     const dur = seconds > 0 ? seconds : 0.4;
-    nugPop = 1;
-    nugPopDur = dur;
+    coinPop = 1;
+    coinPopDur = dur;
     const life = seconds > 0 ? dur : 0.55;
     for (let i = 0; i < 6; i++) {
       const a = -Math.PI * 0.5 + (i - 2.5) * 0.42;
       spawn({
-        kind: "leaf",
-        x: 310,
+        kind: "coin",
+        x: 330,
         y: 36,
-        vx: Math.cos(a) * (36 + Math.random() * 28),
-        vy: -70 - Math.random() * 50,
+        vx: Math.cos(a) * (30 + Math.random() * 24),
+        vy: -64 - Math.random() * 40,
         life: life,
         max: life,
-        size: 0.72,
+        size: 0.7,
         rot: Math.random() * 6,
-        spin: (Math.random() - 0.5) * 7,
+        spin: (Math.random() - 0.5) * 6,
         front: true,
         scroll: false,
         hud: true,
-        grav: 220,
+        grav: 180,
       });
     }
   }
 
-  function onShopCard(id) {
-    if (!id) return;
-    shopFocus = id;
-    if (Meta.owns(id)) {
-      setSkin(id);
-      return;
-    }
-    const result = Meta.buy(id);
-    if (result === "bought" || result === "crew") {
-      setSkin(id);
-      Sfx.score();
-      if (result === "crew") {
-        showToast("Full crew", 1.5);
-        popNugs();
-      }
-      return;
-    }
-    if (result === "broke") shopWhisper = 2.2;
+  function showStreak() {
+    const msg = Meta.takeStreakToast();
+    if (msg) showToast(msg, 1.5);
   }
 
   function saveBest(n) {
@@ -258,26 +220,22 @@
 
   function titlePose(t) {
     const phase = t * 2.15;
-    const bob = Math.sin(phase);
     const rising = Math.cos(phase) < 0;
     return {
-      y: P.START_Y + bob * 10,
-      rot: window.FBFeel.tipRadians(rising ? C.FLAP_TIP_DEG : C.FALL_TIP_DEG),
+      y: P.START_Y + Math.sin(phase) * 6.5,
+      rot: Feel.tipRadians(rising ? C.FLAP_TIP_DEG : C.FALL_TIP_DEG),
       sx: 1,
       sy: 1,
       dead: false,
-      spin: 0,
       skin: skin,
     };
   }
 
   function rankFor(score) {
-    if (score >= 25) return "haze legend";
-    if (score >= 15) return "cloud chaser";
-    if (score >= 8) return "nicely cruising";
-    if (score >= 3) return "finding the rhythm";
-    if (score >= 1) return "first puff";
-    return "snuffed out";
+    if (score >= 50) return "Legend";
+    if (score >= 25) return "Squad";
+    if (score >= 10) return "Rookie";
+    return "Lekker try";
   }
 
   function layoutNow() {
@@ -325,16 +283,21 @@
     }
   }
 
-  function openShop() {
-    overlay = "shop";
-    shopFocus = skin;
-    shopHover = null;
-    shopWhisper = 0;
+  function openChests() {
+    overlay = "chests";
+    chestWhisper = 0;
+    reveal = null;
+  }
+
+  function openCollection() {
+    overlay = "collection";
+    reveal = null;
   }
 
   function goHome() {
     state = TITLE;
     overlay = null;
+    reveal = null;
     jobClaim = false;
     run = null;
     lock = 0;
@@ -342,33 +305,37 @@
     flapQueued = false;
     flash = 0;
     whiteFlash = 0;
-    shake = 0;
     settle = 0;
     settleLife = 0;
+    skimFlash = null;
     particles.length = 0;
     rings.length = 0;
     floaters.length = 0;
     scorePop = 1;
     scoreFlip = 0;
+    showStreak();
   }
 
   function startPlaying() {
     markPlayed();
     jobClaim = false;
     jobsAtRun = jobSnap();
-    bestAtRunStart = best;
     newBest = false;
-    run = P.createRun(undefined, { pickups: !cleanRun });
+    const streakGrant = Meta.noteRun();
+    run = P.createRun();
     state = PLAYING;
+    overlay = null;
+    reveal = null;
     lock = 0;
     deathFreeze = 0;
     flapQueued = true;
-    shake = 0;
     settle = 0;
     settleLife = 0;
     whiteFlash = 0;
+    skimFlash = null;
     rings.length = 0;
     floaters.length = 0;
+    if (streakGrant) popCoins(0.35);
   }
 
   function press() {
@@ -386,51 +353,29 @@
 
   function onFlap(player) {
     player.emberKick = time;
+    player.flapAt = time;
     Sfx.flap();
-    const Pal = window.FBFeel.PALETTE;
-    const body = window.FBFeel.bodyDraw();
+    const body = Feel.bodyDraw();
     const ang = player.rot || 0;
-    const tipX = P.PLAYER_X + Math.cos(ang) * (body.L * 0.46);
-    const tipY = player.y + Math.sin(ang) * (body.L * 0.46);
+    const tipX = P.PLAYER_X + Math.cos(ang) * (body.L * 0.42);
+    const tipY = player.y + Math.sin(ang) * (body.L * 0.42);
     const span = C.SPARK_MAX - C.SPARK_MIN + 1;
     const n = C.SPARK_MIN + Math.floor(Math.random() * span);
     for (let i = 0; i < n; i++) {
       const a = ang + (Math.random() - 0.5) * 1.1;
-      const sp = 50 + Math.random() * 80;
+      const sp = 40 + Math.random() * 70;
       spawn({
         kind: "ember",
         x: tipX,
         y: tipY,
         vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp - 16,
+        vy: Math.sin(a) * sp - 12,
         life: 0.14 + Math.random() * 0.06,
         max: 0.2,
-        size: 1.5 + Math.random() * 0.8,
+        size: 1.6 + Math.random() * 0.8,
         front: true,
         scroll: true,
-        color: i % 2 ? Pal.HOT : Pal.EMBER,
-      });
-    }
-  }
-
-  function burstAt(x, y, kind, n) {
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const sp = 30 + Math.random() * 90;
-      spawn({
-        kind: kind,
-        x: x,
-        y: y,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp,
-        life: 0.4 + Math.random() * 0.3,
-        max: 0.7,
-        size: 3 + Math.random() * 3,
-        rot: Math.random() * 6,
-        spin: (Math.random() - 0.5) * 8,
-        front: true,
-        scroll: true,
-        color: window.FBFeel.PALETTE.EMBER,
+        color: i % 2 ? Feel.PALETTE.HOT : Feel.PALETTE.EMBER,
       });
     }
   }
@@ -438,161 +383,79 @@
   function onScore(ev) {
     scorePop = 1.15;
     scoreFlip = 0.12;
-    const Pal = window.FBFeel.PALETTE;
     const nSpark = reduceMotion ? 3 : 6;
     for (let i = 0; i < nSpark; i++) {
       const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.2;
       spawn({
         kind: "ember",
-        x: P.W / 2 + (Math.random() - 0.5) * 108,
-        y: 104 + (Math.random() - 0.5) * 18,
-        vx: Math.cos(a) * (20 + Math.random() * 30),
-        vy: -24 - Math.random() * 40,
-        life: 0.12,
-        max: 0.12,
-        size: 1.8,
+        x: P.W / 2 + (Math.random() - 0.5) * 90,
+        y: 100,
+        vx: Math.cos(a) * (18 + Math.random() * 24),
+        vy: -20 - Math.random() * 30,
+        life: 0.16,
+        max: 0.16,
+        size: 1.6,
         front: true,
         scroll: false,
         hud: true,
-        grav: -20,
-        color: Pal.GOLD,
+        grav: -10,
+        color: Feel.PALETTE.GOLD,
       });
     }
     const grant = Meta.notePipe();
     Meta.noteScore(run.score);
     if (grant > 0) {
-      showToast("Five clear. +25 nugs", 1.5);
-      popNugs();
+      showToast("Five clear. +25 coins", 1.5);
+      popCoins();
     }
     Sfx.score();
-    rings.push({ x: ev.gapX, y: ev.gapY, radius: 14, life: 0.5, max: 0.5 });
-    floaters.push({ text: "+" + (ev.gain || 1), x: ev.gapX + 24, y: ev.gapY, life: 0.7, max: 0.7, vy: -42 });
-    const half = (ev.gapH || C.GAP_START) / 2;
-    const n = reduceMotion ? 2 : 3;
-    burstAt(ev.gapX, ev.gapY - half, "spark", n);
-    burstAt(ev.gapX, ev.gapY + half, "spark", n);
+    rings.push({ x: ev.gapX, y: ev.gapY, radius: 14, life: 0.45, max: 0.45 });
+    floaters.push({ text: "+1", x: ev.gapX + 20, y: ev.gapY, life: 0.55, max: 0.55, vy: -36 });
+    if (ev.near && (run.skim || 0) < C.SKIM_CAP) {
+      run.skim = (run.skim || 0) + 1;
+      skimFlash = { a: 1, x: ev.gapX, y: ev.gapY, h: ev.gapH };
+      floaters.push({
+        text: "+1",
+        x: ev.gapX + 28,
+        y: ev.gapY - 22,
+        life: 0.5,
+        max: 0.5,
+        vy: -28,
+        color: Feel.PALETTE.GOLD,
+      });
+    }
     if (run.score > best) {
       best = run.score;
       newBest = true;
       saveBest(best);
     }
-    if (run.score >= 15 && Meta.armHeist()) showToast("Heist warming up", 1.5);
-  }
-
-  function onPickup(id) {
-    Sfx.score();
-    const list = window.FBFeel.PICKUPS;
-    let blurb = id;
-    for (let i = 0; i < list.length; i++) if (list[i].id === id) blurb = list[i].blurb;
-    floaters.push({
-      text: blurb,
-      x: P.PLAYER_X + 36,
-      y: run.player.y - 28,
-      life: 0.8,
-      max: 0.8,
-      vy: -36,
-    });
+    if (run.score === 10) showToast("Rookie", 1.2);
+    else if (run.score === 15 || run.score === 30) showToast("Heat up", 0.4);
+    else if (run.score === 25) showToast("Squad", 1.2);
+    else if (run.score === 50) showToast("Legend", 1.2);
   }
 
   function emitTrail(player, dt) {
-    const skins = window.FBFeel.SKINS;
-    const Pal = window.FBFeel.PALETTE;
-    let color = "#C084FC";
-    for (let i = 0; i < skins.length; i++) if (skins[i].id === skin) color = skins[i].trail;
-    const active = run && run.active;
-    const id = active && !active.popping ? active.id : "";
-    let mode = "skin";
-    if (id === "dab_rocket") mode = "jet";
-    else if (id === "magic_gummies") mode = "haze";
-    else if (id === "trail_can") mode = "can";
-    const rate = mode === "jet" ? 46 : mode === "haze" ? 20 : mode === "can" ? 34 : 14;
-    trailAcc += dt * (reduceMotion ? rate * 0.35 : rate);
+    const costume = Feel.costumeById(skin);
+    const color = costume.trail || Feel.PALETTE.CREAM;
+    trailAcc += dt * (reduceMotion ? 5 : 14);
     const ang = player.rot || 0;
-    const backX = P.PLAYER_X - Math.cos(ang) * 34;
-    const backY = player.y - Math.sin(ang) * 34;
+    const backX = P.PLAYER_X - Math.cos(ang) * 36;
+    const backY = player.y - Math.sin(ang) * 36;
     while (trailAcc >= 1) {
       trailAcc -= 1;
-      if (mode === "jet") {
-        spawn({
-          kind: "ember",
-          x: backX + (Math.random() - 0.5) * 4,
-          y: backY + (Math.random() - 0.5) * 6,
-          vx: -170 - Math.random() * 90,
-          vy: (Math.random() - 0.5) * 20,
-          life: 0.2,
-          max: 0.2,
-          size: 3.2,
-          front: false,
-          scroll: true,
-          color: Math.random() < 0.55 ? Pal.CYAN : Pal.HOT,
-        });
-      } else if (mode === "haze") {
-        const hue = (time * 120) % 360;
-        spawn({
-          kind: "smoke",
-          x: backX,
-          y: backY,
-          vx: -14,
-          vy: -4,
-          life: 0.25,
-          max: 0.25,
-          size: 6,
-          front: false,
-          scroll: true,
-          color: "hsl(" + hue.toFixed(0) + ", 52%, 74%)",
-        });
-      } else if (mode === "can") {
-        const hue = (time * 260) % 360;
-        spawn({
-          kind: "smoke",
-          x: backX,
-          y: backY,
-          vx: -28,
-          vy: -10,
-          life: 0.25,
-          max: 0.25,
-          size: 5,
-          front: false,
-          scroll: true,
-          color: "hsl(" + hue.toFixed(0) + ", 92%, 58%)",
-        });
-      } else {
-        spawn({
-          kind: "smoke",
-          x: backX,
-          y: backY,
-          vx: -20,
-          vy: -8,
-          life: 0.25,
-          max: 0.25,
-          size: 4,
-          front: false,
-          scroll: true,
-          color: color,
-        });
-      }
-    }
-  }
-
-  function shatterHex(y) {
-    const n = reduceMotion ? 4 : 7;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + 0.2;
       spawn({
-        kind: "hex",
-        x: P.PLAYER_X + Math.cos(a) * 16,
-        y: y + Math.sin(a) * 10,
-        vx: Math.cos(a) * (60 + Math.random() * 50),
-        vy: Math.sin(a) * (50 + Math.random() * 40) - 16,
-        life: 0.4,
-        max: 0.4,
-        size: 6 + Math.random() * 4,
-        rot: a,
-        spin: (Math.random() - 0.5) * 8,
-        front: true,
-        scroll: false,
-        grav: 40,
-        color: window.FBFeel.PALETTE.GOLD,
+        kind: "smoke",
+        x: backX,
+        y: backY,
+        vx: -18,
+        vy: -6,
+        life: 0.25,
+        max: 0.25,
+        size: 4.5,
+        front: false,
+        scroll: true,
+        color: color,
       });
     }
   }
@@ -601,51 +464,84 @@
     state = OVER;
     deathFreeze = C.DEATH_FREEZE;
     lock = C.DEATH_FREEZE + C.DEATH_BEAT;
-    shake = 0;
     settle = 3.5;
     settleLife = 0.12;
+    whiteFlash = 1;
     rings.push({ x: P.PLAYER_X, y: run.player.y, radius: 6, life: 0.4, max: 0.4 });
     flash = 1;
     run.player.dead = true;
     run.player.spin = 0;
-    run.player.sx = 1.06;
-    run.player.sy = 0.94;
     if (kind === "ground") run.player.vy = -260;
     else run.player.vy = Math.max(80, run.player.vy * 0.2);
     const scored = run.score || 0;
+    const skim = run.skim || 0;
     Meta.noteDeath(scored);
-    Meta.addNugs(scored);
-    banked = scored;
+    banked = scored + skim;
+    Meta.addCoins(banked);
     jobClaim = jobCompletedThisRun();
-    if (jobsProgressed() && !jobClaim) showToast("Job +1", 1.4, true);
-    popNugs(0.3);
+    if (jobsProgressed() && !jobClaim) showToast("Challenge +1", 1.4, true);
+    popCoins(0.3);
     Sfx.crash();
     if (newBest) Sfx.fanfare();
-    const Pal = window.FBFeel.PALETTE;
-    const held = run.active && run.active.id === "gold_chip" && (run.active.held || run.active.popping);
-    if (held) shatterHex(run.player.y);
-    const n = reduceMotion ? 6 : 14;
+    const n = reduceMotion ? 6 : 12;
     for (let i = 0; i < n; i++) {
       spawn({
         kind: "dust",
-        x: P.PLAYER_X + (Math.random() - 0.5) * 22,
+        x: P.PLAYER_X + (Math.random() - 0.5) * 24,
         y: run.player.y + (Math.random() - 0.5) * 12,
         vx: (Math.random() - 0.5) * 36,
-        vy: -16 - Math.random() * 70,
-        life: 0.26 + Math.random() * 0.14,
+        vy: -16 - Math.random() * 60,
+        life: 0.26 + Math.random() * 0.12,
         max: 0.4,
-        size: 2.2 + Math.random() * 2.8,
+        size: 2.2 + Math.random() * 2.4,
         front: true,
         scroll: false,
-        grav: -36,
-        color: i % 6 === 0 ? Pal.EMBER : Pal.ASH,
+        grav: -30,
+        color: i % 5 === 0 ? Feel.PALETTE.EMBER : Feel.PALETTE.ASH,
       });
     }
   }
 
+  function finishReveal(equip) {
+    if (!reveal || !reveal.result) {
+      reveal = null;
+      return;
+    }
+    const result = reveal.result;
+    if (equip && result.id) setSkin(result.id);
+    if (result.dupe) showToast("Duplicate · +" + result.refund + " coins", 1.5);
+    if (result.full) {
+      showToast("Full kit", 1.5);
+      popCoins();
+    } else if (result.dupe) popCoins(0.35);
+    reveal = null;
+  }
+
+  function onOpenChest(id) {
+    if (reveal) return;
+    const result = Meta.open(id);
+    if (result.error === "broke") {
+      chestWhisper = 2.2;
+      return;
+    }
+    if (!result.ok) return;
+    Sfx.score();
+    reveal = { life: 0.6, result: result };
+  }
+
+  function onCollectionCard(id) {
+    if (Meta.owns(id)) {
+      setSkin(id);
+      return;
+    }
+    openChests();
+  }
+
   function updateFx(dt) {
-    if (shopWhisper > 0) shopWhisper = Math.max(0, shopWhisper - dt);
-    if (nugPop > 0) nugPop = Math.max(0, nugPop - dt / (nugPopDur || 0.4));
+    if (chestWhisper > 0) chestWhisper = Math.max(0, chestWhisper - dt);
+    if (coinPop > 0) coinPop = Math.max(0, coinPop - dt / (coinPopDur || 0.4));
+    if (reveal && reveal.life > 0) reveal.life = Math.max(0, reveal.life - dt);
+    if (skimFlash && skimFlash.a > 0) skimFlash.a = Math.max(0, skimFlash.a - dt / 0.1);
     if (toasts.length && !overlay) {
       toasts[0].life -= dt;
       if (toasts[0].life <= 0) toasts.shift();
@@ -679,7 +575,6 @@
       f.x -= shift;
       if (f.life <= 0) floaters.splice(i, 1);
     }
-    if (shake > 0) shake = 0;
     if (settleLife > 0) {
       settleLife = Math.max(0, settleLife - dt);
       if (settleLife === 0) settle = 0;
@@ -692,14 +587,12 @@
 
   function update(dt) {
     time += dt;
-
     if (state === TITLE) {
       worldSpeed = 34;
       scroll += worldSpeed * dt;
       updateFx(dt);
       return;
     }
-
     if (state === OVER) {
       worldSpeed = 0;
       if (deathFreeze > 0) deathFreeze -= dt;
@@ -707,30 +600,18 @@
       lock -= dt;
       if (lock <= 0 && flapQueued) startPlaying();
     }
-
     if (state === PLAYING && run) {
       const flap = flapQueued;
       flapQueued = false;
       const before = run.player;
       const ev = P.stepRun(run, dt, flap);
       worldSpeed = P.scrollSpeed(run.score);
-      if (run.active && run.active.id === "dab_rocket" && !run.active.popping) {
-        worldSpeed *= C.PU_ROCKET_MULT;
-      }
       scroll += worldSpeed * dt;
       if (flap) onFlap(before);
       if (ev.scored) onScore(ev);
-      if (ev.pickups) {
-        for (let i = 0; i < ev.pickups.length; i++) onPickup(ev.pickups[i]);
-      }
-      if (ev.blocked) {
-        whiteFlash = 1;
-        shatterHex(run.player.y);
-      }
       if (ev.died) onDie(ev.died);
       if (state === PLAYING) emitTrail(run.player, dt);
     }
-
     updateFx(dt);
   }
 
@@ -743,25 +624,20 @@
       canvas.width = bw;
       canvas.height = bh;
     }
-
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.fillStyle = "#100812";
+    ctx.fillStyle = "#063024";
     ctx.fillRect(0, 0, layout.vw, layout.vh);
 
     if (layout.framed) {
       const g = ctx.createRadialGradient(
-        layout.vw / 2,
-        layout.vh / 2,
-        20,
-        layout.vw / 2,
-        layout.vh / 2,
-        Math.max(layout.vw, layout.vh) * 0.55
+        layout.vw / 2, layout.vh / 2, 20,
+        layout.vw / 2, layout.vh / 2, Math.max(layout.vw, layout.vh) * 0.55
       );
-      g.addColorStop(0, "rgba(92, 42, 120, 0.35)");
-      g.addColorStop(1, "rgba(16, 8, 18, 0)");
+      g.addColorStop(0, "rgba(255, 179, 106, 0.16)");
+      g.addColorStop(1, "rgba(6, 48, 36, 0)");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, layout.vw, layout.vh);
     }
@@ -769,7 +645,6 @@
     ctx.save();
     ctx.translate(layout.ox, layout.oy);
     ctx.scale(layout.scale, layout.scale);
-
     Draw.setChrome(time, pointer);
     const radius = layout.framed ? 28 : 0;
     ctx.save();
@@ -778,27 +653,20 @@
 
     ctx.save();
     if (settleLife > 0) ctx.translate(0, settle * (settleLife / 0.12));
-
     const player = state === TITLE || !run ? titlePose(time) : run.player;
     player.skin = skin;
     player.ash = state === OVER && flash <= 0;
-    const heldChip = run && run.active && run.active.id === "gold_chip" && run.active.held && !run.active.popping;
-    player.shield = state === PLAYING && !!heldChip;
     Draw.drawBackground(ctx, scroll, time);
     Draw.drawParticles(ctx, particles, false);
     if (state === TITLE) Draw.drawHomeWorld(ctx, scroll, time);
-    if (run && state !== TITLE) {
-      Draw.drawTowers(ctx, run.towers, time);
-      if (run.pickups) {
-        for (let i = 0; i < run.pickups.length; i++) Draw.drawPickup(ctx, run.pickups[i], time);
-      }
-    }
-    Draw.drawGround(ctx, scroll);
+    if (run && state !== TITLE) Draw.drawTowers(ctx, run.towers, time);
+    Draw.drawGround(ctx, scroll, time);
     if (state !== TITLE) Draw.drawShadow(ctx, player);
     Draw.drawRings(ctx, rings);
     if (state !== TITLE) Draw.drawPlayer(ctx, player, time);
     Draw.drawParticles(ctx, particles, true);
     Draw.drawFloaters(ctx, floaters);
+    if (skimFlash) Draw.drawSkim(ctx, skimFlash);
     ctx.restore();
 
     if (state === TITLE) {
@@ -814,16 +682,13 @@
       if (!overlay) Draw.drawMenu(ctx, "title", claimReady());
     } else if (state === PLAYING && run) {
       Draw.drawHUD(ctx, { score: run.score, pop: scorePop, flip: scoreFlip });
-      Draw.drawBuffs(ctx, run.active, cleanRun);
     } else if (state === OVER && run && deathFreeze <= 0) {
       const ready = lock <= 0;
-      const hintAlpha = ready ? 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(time * 4)) : 0.35;
       Draw.drawGameOver(ctx, {
         score: run.score,
         best: best,
         newBest: newBest,
         rank: rankFor(run.score),
-        hintAlpha: hintAlpha,
         ready: ready,
         banked: banked,
         jobClaim: jobClaim,
@@ -834,35 +699,33 @@
     Draw.drawFlash(ctx, flash, P.PLAYER_X, player.y);
     Draw.drawWhite(ctx, whiteFlash);
     Draw.drawVignette(ctx);
-    if (overlay === "shop") {
-      Draw.drawShop(ctx, {
-        nugs: Meta.nugs(),
+    if (overlay === "chests") {
+      Draw.drawChests(ctx, { coins: Meta.coins(), time: time, whisper: chestWhisper > 0 });
+      if (reveal) Draw.drawReveal(ctx, { result: reveal.result, life: reveal.life, time: time });
+    } else if (overlay === "collection") {
+      Draw.drawCollectionPanel(ctx, {
         skin: skin,
         time: time,
-        hover: shopHover,
-        focus: shopFocus,
-        whisper: shopWhisper > 0,
-        reduceMotion: reduceMotion,
+        owned: Meta.ownedCount(),
         owns: function (id) { return Meta.owns(id); },
       });
-    } else if (overlay === "jobs") {
-      Draw.drawJobs(ctx);
+    } else if (overlay === "challenges") {
+      Draw.drawChallenges(ctx);
     }
-    Draw.drawNugs(ctx, Meta.nugs(), nugPop);
+    Draw.drawCoins(ctx, Meta.coins(), coinPop);
     Draw.drawParticles(ctx, particles, true, true);
     if (!overlay && toasts.length) {
       const item = toasts[0];
-      item.y = state === OVER ? 132 : state === TITLE ? 248 : 168;
+      item.y = state === OVER ? 132 : state === TITLE ? 250 : 156;
       Draw.drawToast(ctx, item);
     }
     Draw.drawMute(ctx, muted);
     if (showHitboxes && run && state !== TITLE) Draw.drawDebug(ctx, run);
-
     ctx.restore();
 
     if (layout.framed) {
       ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(244, 232, 193, 0.28)";
+      ctx.strokeStyle = "rgba(255, 248, 236, 0.28)";
       Draw.pathRound(ctx, 0, 0, P.W, P.H, radius);
       ctx.stroke();
     }
@@ -892,19 +755,33 @@
     e.preventDefault();
     const pt = toGame(e);
     pointer = pt;
-    if (overlay === "shop") {
-      const hit = Draw.shopHit(pt);
-      if (hit && hit.action === "close") overlay = null;
-      else if (hit && hit.action === "card") onShopCard(hit.id);
+    if (overlay === "chests" && reveal) {
+      const hit = Draw.revealHit(pt, reveal.life);
+      if (hit.action === "skip") reveal.life = 0;
+      else if (hit.action === "equip") finishReveal(true);
+      else finishReveal(false);
       return;
     }
-    if (overlay === "jobs") {
-      const hit = Draw.jobsHit(pt);
+    if (overlay === "chests") {
+      const hit = Draw.chestHit(pt);
+      if (hit && hit.action === "open") onOpenChest(hit.id);
+      else if (hit && hit.action === "close") overlay = null;
+      return;
+    }
+    if (overlay === "collection") {
+      const hit = Draw.collectionPanelHit(pt);
+      if (!hit || hit.action === "close") overlay = null;
+      else if (hit.action === "chests") openChests();
+      else if (hit.action === "card") onCollectionCard(hit.id);
+      return;
+    }
+    if (overlay === "challenges") {
+      const hit = Draw.challengeHit(pt);
       if (hit && hit.action === "close") overlay = null;
       else if (hit && hit.action === "claim") {
         if (Meta.claim(hit.id)) {
           Sfx.score();
-          popNugs();
+          popCoins();
         }
       }
       return;
@@ -919,22 +796,29 @@
         goHome();
         return;
       }
-      if (menu === "shop") {
-        openShop();
+      if (menu === "chests") {
+        openChests();
         return;
       }
-      if (menu) {
-        overlay = menu;
+      if (menu === "challenges") {
+        overlay = "challenges";
         return;
       }
     }
-    if (state === OVER && deathFreeze <= 0 && Draw.stashHit(pt, jobClaim) === "jobs") {
-      overlay = "jobs";
+    if (state === OVER && deathFreeze <= 0) {
+      if (Draw.stashHit(pt, jobClaim) === "challenges") {
+        overlay = "challenges";
+        return;
+      }
+      if (Draw.restartHit(pt)) {
+        if (lock <= 0) press();
+        else flapQueued = true;
+      }
       return;
     }
     if (state === TITLE) {
       if (Draw.collectionHit(pt)) {
-        openShop();
+        openCollection();
         return;
       }
       if (Draw.playHit(pt)) press();
@@ -943,27 +827,8 @@
     press();
   }, { passive: false });
 
-  window.addEventListener("pointermove", function (e) {
-    if (overlay !== "shop") {
-      shopHover = null;
-      return;
-    }
-    const pt = toGame(e);
-    const hit = Draw.shopHit(pt);
-    if (hit && hit.action === "card") {
-      shopHover = hit.id;
-      shopFocus = hit.id;
-    } else {
-      shopHover = null;
-    }
-  });
-
-  window.addEventListener("pointerup", function () {
-    pointer = null;
-  });
-  window.addEventListener("pointercancel", function () {
-    pointer = null;
-  });
+  window.addEventListener("pointerup", function () { pointer = null; });
+  window.addEventListener("pointercancel", function () { pointer = null; });
 
   const held = Object.create(null);
 
@@ -971,24 +836,10 @@
     if (e.repeat || held[e.code]) return;
     held[e.code] = true;
     if (overlay) {
-      if (overlay === "shop" && (e.code === "ArrowLeft" || e.code === "ArrowRight")) {
-        e.preventDefault();
-        const skins = window.FBFeel.SKINS;
-        let i = 0;
-        for (let k = 0; k < skins.length; k++) if (skins[k].id === shopFocus) i = k;
-        const dir = e.code === "ArrowRight" ? 1 : -1;
-        shopFocus = skins[(i + dir + skins.length) % skins.length].id;
-        shopHover = null;
-        return;
-      }
-      if (overlay === "shop" && e.code === "Enter") {
-        e.preventDefault();
-        onShopCard(shopFocus);
-        return;
-      }
       if (e.code === "Escape" || e.code === "Space" || e.code === "ArrowUp") {
         e.preventDefault();
-        overlay = null;
+        if (overlay === "chests" && reveal) finishReveal(false);
+        else overlay = null;
       }
       return;
     }
@@ -998,10 +849,6 @@
     }
     if (e.code === "KeyH") {
       showHitboxes = !showHitboxes;
-      return;
-    }
-    if (e.code === "KeyK") {
-      if (state === TITLE) setClean(!cleanRun);
       return;
     }
     if (e.code === "KeyQ" || e.code === "BracketLeft") {
@@ -1014,11 +861,9 @@
     }
     if (e.code.indexOf("Digit") === 0) {
       const n = parseInt(e.code.slice(5), 10);
-      const skins = window.FBFeel.SKINS;
-      if (n >= 1 && n <= skins.length && Meta.owns(skins[n - 1].id)) {
-        setSkin(skins[n - 1].id);
-        return;
-      }
+      const list = Feel.COSTUMES;
+      if (n >= 1 && n <= list.length && Meta.owns(list[n - 1].id)) setSkin(list[n - 1].id);
+      return;
     }
     if (e.code === "Space" || e.code === "ArrowUp") {
       e.preventDefault();
@@ -1044,12 +889,11 @@
     if (document.hidden) releaseKeys();
   });
   window.addEventListener("blur", releaseKeys);
-
   window.addEventListener("resize", layoutNow);
   if (window.visualViewport) window.visualViewport.addEventListener("resize", layoutNow);
 
   function boot() {
-    const crewGrant = Meta.takeFullCrew();
+    const kit = Meta.takeFullKit();
     layoutNow();
     render();
     const start = function () {
@@ -1060,19 +904,18 @@
           if (splash.parentNode) splash.parentNode.removeChild(splash);
         }, 260);
       }
-      if (crewGrant) {
-        showToast("Full crew", 1.5);
-        popNugs();
+      if (kit) {
+        showToast("Full kit", 1.5);
+        popCoins();
       }
+      showStreak();
       requestAnimationFrame(frame);
     };
     if (document.fonts && document.fonts.load) {
       Promise.race([
         document.fonts.load('64px "Lilita One"'),
         document.fonts.load('32px Anton'),
-        new Promise(function (resolve) {
-          setTimeout(resolve, 1200);
-        }),
+        new Promise(function (resolve) { setTimeout(resolve, 1200); }),
       ]).then(start, start);
     } else {
       start();

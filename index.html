@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#1A1420" />
-    <meta name="description" content="Flappy Blunt. One flap. Chill heist energy." />
+    <meta name="theme-color" content="#063024" />
+    <meta name="description" content="Flappy Blunt. One flap. Lekker energy." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -19,10 +19,13 @@
   </head>
   <body>
     <div id="splash">
-      <img src="assets/splash.png" alt="Flappy Blunt. One flap. Chill heist energy." />
+      <div class="splash-card">
+        <strong>FLAPPY BLUNT</strong>
+        <span>One flap. Lekker energy.</span>
+      </div>
     </div>
     <h1 class="sr-only">Flappy Blunt</h1>
-    <p class="sr-only">One-button flyer. Press the gold PLAY button, or press space or arrow up, to start. In the air, tap or press space to flap. After a crash, tap to fly again.</p>
+    <p class="sr-only">One-button flyer. Press the gold PLAY button, or press space or arrow up, to start. In the air, tap or press space to flap. After a crash, press the gold RESTART button to fly again. Chests and challenges never start a run.</p>
     <canvas id="game" width="420" height="750" aria-label="Flappy Blunt. Press PLAY, or press space, to start. Tap to flap."></canvas>
     <script src="js/feel.js"></script>
     <script src="js/physics.js"></script>

@@ -28,7 +28,6 @@
   const COL_W = 74;
 
   const tipRadians = Feel.tipRadians;
-
   const scrollSpeed = Feel.scrollSpeed;
   const gapHeight = Feel.gapHeight;
 
@@ -47,8 +46,8 @@
     };
   }
 
-  function spacingFor() {
-    return C.PIPE_SPACING;
+  function spacingFor(score) {
+    return Feel.pairSpacing(score || 0);
   }
 
   function gateInset() {
@@ -59,29 +58,61 @@
     return PLAYER_X + HITBOX_W / 2 + C.SCROLL_START * C.FIRST_PIPE_DELAY - gateInset();
   }
 
-  /* Seconds until the first gate's collider can touch the blunt, at start speed. */
   function runwaySeconds() {
     const lead = initialTowerX() + gateInset();
     return (lead - (PLAYER_X + HITBOX_W / 2)) / C.SCROLL_START;
   }
 
-  /* Vertical wander stays inside what the locked spacing and scroll can climb. */
+  function gapLimits(gapH) {
+    return {
+      min: 102 + gapH / 2,
+      max: GROUND_Y - 92 - gapH / 2,
+    };
+  }
+
   function maxGapStep(score) {
     const harsh = score < 1 ? 0.28 : score < 3 ? 0.55 : score < 8 ? 0.8 : 1;
     return 40 + 70 * harsh;
   }
 
   function nextGapY(prev, gapH, rng, score) {
-    const min = 102 + gapH / 2;
-    const max = GROUND_Y - 92 - gapH / 2;
-    const mid = (min + max) / 2;
+    const limits = gapLimits(gapH);
+    const mid = (limits.min + limits.max) / 2;
     const harsh = score < 1 ? 0.28 : score < 3 ? 0.55 : score < 8 ? 0.8 : 1;
     const pull = 0.2;
     let g = prev * (1 - pull) + mid * pull + (rng() * 2 - 1) * 124 * harsh;
     const maxStep = maxGapStep(score);
     g = clamp(g, prev - maxStep, prev + maxStep);
-    g = clamp(g, min, max);
+    g = clamp(g, limits.min, limits.max);
     return g;
+  }
+
+  /* Straight / Rise / Fall / Breath, four pairs each, once score reaches 16. */
+  function patternStep(run, score) {
+    const baseH = gapHeight(score);
+    if (!run.spawned) {
+      run.spawned = true;
+      return { gapY: run.gapY, gapH: baseH, bob: false, pack: -1, slot: -1 };
+    }
+    if (score < C.PATTERN_SCORE) {
+      run.gapY = nextGapY(run.gapY, baseH, run.rng, score);
+      return { gapY: run.gapY, gapH: baseH, bob: false, pack: -1, slot: -1 };
+    }
+    const pack = Math.floor(run.packPairs / 4) % 4;
+    const slot = run.packPairs % 4;
+    const limits = gapLimits(baseH);
+    if (pack === 1) run.gapY = clamp(run.gapY + C.RISE_PX, limits.min, limits.max);
+    else if (pack === 2) run.gapY = clamp(run.gapY - C.RISE_PX, limits.min, limits.max);
+    else run.gapY = nextGapY(run.gapY, baseH, run.rng, score);
+    let gapH = baseH;
+    if (pack === 3 && slot === 0) {
+      gapH = baseH + C.BREATH_PX;
+      const wide = gapLimits(gapH);
+      run.gapY = clamp(run.gapY, wide.min, wide.max);
+    }
+    const bob = score >= C.BOB_SCORE && pack === 3;
+    run.packPairs += 1;
+    return { gapY: run.gapY, gapH: gapH, bob: bob, pack: pack, slot: slot };
   }
 
   function towerColliders(tower) {
@@ -120,6 +151,15 @@
     return false;
   }
 
+  /* Surviving skim: hitbox edge within 6px of a lip. A center-to-lip gap of 6px would already overlap the 24px box. */
+  function skimClearance(y, tower) {
+    const top = tower.gapY - tower.gapH / 2;
+    const bot = tower.gapY + tower.gapH / 2;
+    const edgeTop = (y - HITBOX_H / 2) - top;
+    const edgeBot = bot - (y + HITBOX_H / 2);
+    return Math.min(edgeTop, edgeBot);
+  }
+
   function createPlayer() {
     return {
       y: START_Y,
@@ -134,14 +174,9 @@
     };
   }
 
-  function stepPlayer(p, dt, flap, dead, gravityScale) {
-    if (flap && !dead) {
-      p.vy = FLAP_IMPULSE;
-      p.sx = 1.08;
-      p.sy = 0.92;
-    }
-    const g = GRAVITY * (gravityScale || 1);
-    p.vy = Math.min(MAX_FALL, p.vy + g * dt);
+  function stepPlayer(p, dt, flap, dead) {
+    if (flap && !dead) p.vy = FLAP_IMPULSE;
+    p.vy = Math.min(MAX_FALL, p.vy + GRAVITY * dt);
     p.y += p.vy * dt;
 
     const pose = tipRadians(!dead && p.vy < 0 ? C.FLAP_TIP_DEG : C.FALL_TIP_DEG);
@@ -164,113 +199,81 @@
       }
     }
 
-    const sk = 1 - Math.exp(-14 * dt);
-    p.sx += (1 - (p.sx || 1)) * sk;
-    p.sy += (1 - (p.sy || 1)) * sk;
-    p.wing = (p.wing || 0) * Math.exp(-8 * dt);
+    p.sx = 1;
+    p.sy = 1;
     return p;
   }
 
-  const PICKUP_IDS = ["nug_24k", "nug_haze", "dab_rocket", "magic_gummies", "gold_chip", "trail_can"];
-
-  function createRun(seed, opts) {
+  function createRun(seed) {
     const rng = mulberry32(seed == null ? (Math.random() * 0xffffffff) >>> 0 : seed >>> 0);
     const gapH = gapHeight(0);
     return {
       score: 0,
       towers: [],
-      pickups: [],
-      pickupsEnabled: !!(opts && opts.pickups),
-      active: null,
-      nextPickupPipe: C.PU_FIRST_PIPE,
-      nextX: initialTowerX(),
+      skim: 0,
       alive: true,
       spawned: false,
+      packPairs: 0,
       player: createPlayer(),
-      rng,
+      rng: rng,
       gapY: START_Y - 18,
-      gapH,
+      gapH: gapH,
       time: 0,
+      nextX: initialTowerX(),
     };
   }
 
-  function grantPickup(run, id) {
-    const t = run.time;
-    const active = { id: id, until: 0, armed: false, popping: false };
-    if (id === "nug_24k") active.armed = true;
-    else if (id === "nug_haze") active.until = t + C.PU_HAZE_TIME;
-    else if (id === "dab_rocket") active.until = t + C.PU_ROCKET_TIME;
-    else if (id === "magic_gummies") active.until = t + C.PU_FLOAT_TIME;
-    else if (id === "gold_chip") active.held = true;
-    else if (id === "trail_can") active.until = t + C.PU_TRAIL_TIME;
-    run.active = active;
-  }
-
-  function effectLive(run, id) {
-    const a = run.active;
-    return !!(a && a.id === id && !a.popping);
-  }
-
-  function playerHitsPickup(y, pk) {
-    const box = playerBox(y);
-    const nx = clamp(pk.x, box.x, box.x + box.w);
-    const ny = clamp(pk.y, box.y, box.y + box.h);
-    const dx = pk.x - nx;
-    const dy = pk.y - ny;
-    const r = C.PU_RADIUS;
-    return dx * dx + dy * dy <= r * r;
-  }
-
   function stepRun(run, dt, flap) {
-    const ev = { died: null, scored: false, gain: 0, gapX: 0, gapY: 0, flapped: false, pickups: [], blocked: null };
+    const ev = {
+      died: null,
+      scored: false,
+      gain: 0,
+      gapX: 0,
+      gapY: 0,
+      gapH: 0,
+      flapped: false,
+      near: false,
+      pickups: [],
+      blocked: null,
+    };
     if (!run.alive) return ev;
 
-    if (run.player.invuln > 0) run.player.invuln -= dt;
-    if (run.active && run.active.until && run.time >= run.active.until) run.active = null;
-    const floating = effectLive(run, "magic_gummies");
     if (flap) ev.flapped = true;
-    stepPlayer(run.player, dt, flap, false, floating ? C.PU_FLOAT_GRAVITY : 1);
+    stepPlayer(run.player, dt, flap, false);
 
-    let speed = scrollSpeed(run.score);
-    if (effectLive(run, "dab_rocket")) speed *= C.PU_ROCKET_MULT;
+    const speed = scrollSpeed(run.score);
     run.nextX -= speed * dt;
-    for (let i = 0; i < run.towers.length; i++) run.towers[i].x -= speed * dt;
-    if (run.pickups) {
-      for (let i = run.pickups.length - 1; i >= 0; i--) {
-        run.pickups[i].x -= speed * dt;
-        if (run.pickups[i].x < -40) run.pickups.splice(i, 1);
+    for (let i = 0; i < run.towers.length; i++) {
+      const t = run.towers[i];
+      t.x -= speed * dt;
+      if (t.bob) {
+        const limits = gapLimits(t.gapH);
+        const phase = run.time * (Math.PI * 2 * C.BOB_HZ) + (t.bobPhase || 0);
+        t.gapY = clamp(t.baseGapY + Math.sin(phase) * C.BOB_PX, limits.min, limits.max);
       }
+      const dist = t.x - W;
+      t.pulse = !!(t.bob && dist > 0 && dist <= speed * 0.3);
     }
 
     let guard = 0;
     while (run.nextX < SPAWN_AT && guard++ < 6) {
-      const gapH = gapHeight(run.score);
-      if (run.spawned) run.gapY = nextGapY(run.gapY, gapH, run.rng, run.score);
-      run.spawned = true;
+      const shaped = patternStep(run, run.score);
       const seed = (run.rng() * 0x7fffffff) | 0;
-      const variant = (run.rng() * 3) | 0;
       const tower = {
         x: run.nextX,
-        gapY: run.gapY,
-        gapH,
+        gapY: shaped.gapY,
+        baseGapY: shaped.gapY,
+        gapH: shaped.gapH,
         scored: false,
-        seed,
-        variant,
+        seed: seed,
+        motif: Feel.motifFor(run.score, seed),
+        bob: shaped.bob,
+        bobPhase: shaped.bob ? run.rng() * Math.PI * 2 : 0,
+        pulse: false,
+        pack: shaped.pack,
       };
-      if (run.pickupsEnabled && run.towers.length >= 1 && run.towers.length + 1 === run.nextPickupPipe) {
-        const prev = run.towers[run.towers.length - 1];
-        const id = PICKUP_IDS[(run.rng() * PICKUP_IDS.length) | 0];
-        run.pickups.push({
-          id: id,
-          pipe: run.nextPickupPipe,
-          x: (prev.x + tower.x) / 2 + VIS_W / 2,
-          y: (prev.gapY + tower.gapY) / 2,
-        });
-        const span = C.PU_GAP_MAX - C.PU_GAP_MIN + 1;
-        run.nextPickupPipe += C.PU_GAP_MIN + ((run.rng() * span) | 0);
-      }
       run.towers.push(tower);
-      run.nextX += spacingFor();
+      run.nextX += spacingFor(run.score);
     }
 
     const p = run.player;
@@ -279,64 +282,36 @@
       const cx = t.x + VIS_W / 2;
       if (!t.scored && cx < PLAYER_X) {
         t.scored = true;
-        let gain = 1;
-        if (effectLive(run, "nug_haze")) gain *= C.PU_HAZE_MULT;
-        if (effectLive(run, "nug_24k") && run.active.armed) {
-          gain = C.PU_NUG_BONUS;
-          run.active = null;
-        }
-        run.score += gain;
+        run.score += 1;
         ev.scored = true;
-        ev.gain = gain;
+        ev.gain = 1;
         ev.gapX = cx;
         ev.gapY = t.gapY;
         ev.gapH = t.gapH;
+        const clearance = skimClearance(p.y, t);
+        ev.near = clearance >= 0 && clearance <= C.SKIM_PX;
       }
     }
 
-    if (run.pickups) {
-      for (let i = run.pickups.length - 1; i >= 0; i--) {
-        if (!playerHitsPickup(p.y, run.pickups[i])) continue;
-        const id = run.pickups[i].id;
-        grantPickup(run, id);
-        ev.pickups.push(id);
-        run.pickups.splice(i, 1);
-      }
-    }
-
-    function shieldHit(kind) {
-      if (effectLive(run, "gold_chip") && run.active.held && p.invuln <= 0) {
-        run.active = { id: "gold_chip", popping: true, until: run.time + C.PU_IFRAME };
-        p.invuln = C.PU_IFRAME;
-        p.vy = FLAP_IMPULSE;
-        if (kind === "ground") p.y = GROUND_Y - HITBOX_H / 2 - 6;
-        ev.blocked = kind;
-        return true;
-      }
-      return false;
-    }
-
-    if (p.invuln <= 0 && playerHitsGround(p.y)) {
-      if (!shieldHit("ground")) {
-        run.alive = false;
-        ev.died = "ground";
-      }
-    } else if (p.invuln <= 0) {
+    if (playerHitsGround(p.y)) {
+      run.alive = false;
+      ev.died = "ground";
+    } else {
       for (let i = 0; i < run.towers.length; i++) {
         const t = run.towers[i];
         if (t.x > PLAYER_X + 90 || t.x + VIS_W < PLAYER_X - 90) continue;
         if (playerHitsTower(p.y, t)) {
-          if (!shieldHit("tower")) {
-            run.alive = false;
-            ev.died = "tower";
-          }
+          run.alive = false;
+          ev.died = "tower";
           break;
         }
       }
     }
 
+    if (ev.died) ev.near = false;
+
     if (run.towers.length > 8) {
-      run.towers = run.towers.filter((t) => t.x + VIS_W > -60);
+      run.towers = run.towers.filter(function (t) { return t.x + VIS_W > -60; });
     }
 
     run.time += dt;
@@ -344,41 +319,42 @@
   }
 
   return {
-    W,
-    H,
-    GROUND_H,
-    GROUND_Y,
-    PLAYER_X,
-    START_Y,
-    CEILING,
+    W: W,
+    H: H,
+    GROUND_H: GROUND_H,
+    GROUND_Y: GROUND_Y,
+    PLAYER_X: PLAYER_X,
+    START_Y: START_Y,
+    CEILING: CEILING,
     CONFIG: C,
-    GRAVITY,
-    FLAP_IMPULSE,
-    MAX_FALL,
-    HITBOX_W,
-    HITBOX_H,
-    SPAWN_AT,
-    VIS_W,
-    COL_W,
-    tipRadians,
-    clamp,
-    mulberry32,
-    scrollSpeed,
-    gapHeight,
-    spacingFor,
-    initialTowerX,
-    runwaySeconds,
-    maxGapStep,
-    nextGapY,
-    towerColliders,
-    playerBox,
-    playerHitsGround,
-    playerHitsTower,
-    createPlayer,
-    stepPlayer,
-    createRun,
-    stepRun,
-    grantPickup,
-    PICKUP_IDS,
+    GRAVITY: GRAVITY,
+    FLAP_IMPULSE: FLAP_IMPULSE,
+    MAX_FALL: MAX_FALL,
+    HITBOX_W: HITBOX_W,
+    HITBOX_H: HITBOX_H,
+    SPAWN_AT: SPAWN_AT,
+    VIS_W: VIS_W,
+    COL_W: COL_W,
+    tipRadians: tipRadians,
+    clamp: clamp,
+    mulberry32: mulberry32,
+    scrollSpeed: scrollSpeed,
+    gapHeight: gapHeight,
+    spacingFor: spacingFor,
+    initialTowerX: initialTowerX,
+    runwaySeconds: runwaySeconds,
+    maxGapStep: maxGapStep,
+    nextGapY: nextGapY,
+    patternStep: patternStep,
+    gapLimits: gapLimits,
+    skimClearance: skimClearance,
+    towerColliders: towerColliders,
+    playerBox: playerBox,
+    playerHitsGround: playerHitsGround,
+    playerHitsTower: playerHitsTower,
+    createPlayer: createPlayer,
+    stepPlayer: stepPlayer,
+    createRun: createRun,
+    stepRun: stepRun,
   };
 });
