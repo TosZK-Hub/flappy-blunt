@@ -27,7 +27,7 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: #1a1420;
+  background: #063024;
   overflow: hidden;
   position: fixed;
   inset: 0;
@@ -47,15 +47,30 @@ canvas {
   position: fixed;
   inset: 0;
   z-index: 8;
-  background: #1a1420;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #ffb36a 0%, #6b3fa0 48%, #1e3a5f 78%, #063024 100%);
   transition: opacity 220ms ease;
 }
 
-#splash img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
+.splash-card {
+  text-align: center;
+  color: #fff8ec;
+  font-family: "Lilita One", sans-serif;
+}
+
+.splash-card strong {
+  display: block;
+  font-size: 42px;
+  letter-spacing: 0.04em;
+  font-weight: 400;
+}
+
+.splash-card span {
+  display: block;
+  margin-top: 8px;
+  font-size: 18px;
 }
 
 #splash.is-gone {

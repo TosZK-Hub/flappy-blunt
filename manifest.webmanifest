@@ -1,12 +1,12 @@
 {
   "name": "Flappy Blunt",
   "short_name": "Flappy Blunt",
-  "description": "One flap. Chill heist energy.",
+  "description": "One flap. Lekker energy.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#1A1420",
-  "theme_color": "#1A1420",
+  "background_color": "#063024",
+  "theme_color": "#063024",
   "icons": [
     {
       "src": "assets/icon-192.png",

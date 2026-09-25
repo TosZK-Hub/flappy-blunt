@@ -1,16 +1,14 @@
 # Flappy Blunt
 
-A one-button dusk flyer. The pilot is a winged blunt. The gates are grinder towers. One flap. Chill heist energy.
+A one-button township flyer. The pilot is a plump cartoon mascot, tip to the right. The gates are braai drums, minibus slices, pylon discs, and protea columns. One flap. Lekker energy.
 
-This is the Feel-CLEAR web playable: Visual System V2, Wanted-slab home, nugs / jobs / cosmetics shop, PLAY-rect-only start, and the death-card hierarchy. It is launch-ready as a static site. It is not an App Store or Google Play submission.
+Canvas volumetric cartoon. No WebGL. Night Heist stays parked.
 
 ## Play
 
 [https://toszk-hub.github.io/flappy-blunt/](https://toszk-hub.github.io/flappy-blunt/)
 
-GitHub Pages publishes the default branch `main` from the repository root (`/`). `index.html` is already there, with `.nojekyll` so the canvas game is served as static files.
-
-To play on your machine:
+GitHub Pages publishes `main` from the repository root. This branch is the SA cartoon upgrade.
 
 ```bash
 git clone https://github.com/TosZK-Hub/flappy-blunt.git
@@ -18,98 +16,57 @@ cd flappy-blunt
 npx serve
 ```
 
-Open the URL `npx serve` prints. The default is `http://localhost:3000`. A short Night Heist splash clears into the home menu.
-
-Serve the folder that contains `index.html`. Do not serve a parent folder or a subdirectory. GitHub Pages serves that same root at the live URL above.
-
-Add to Home Screen uses `manifest.webmanifest`, `sw.js`, and the icons in `assets/`. After one online visit, the shell can open from that icon without a fresh download.
+Open the URL `npx serve` prints. Serve the folder that contains `index.html`.
 
 ## Controls
 
-**PLAY** is the gold button. Under it, cream type says “Tap / Space to flap.” The first cold open also whispers “Clear the grinders.” That line leaves after the first **PLAY** and does not come back.
-
-Only the gold **PLAY** rectangle starts a run, along with Space or Arrow Up. A tap on the Wanted slab, the blunt, the best-score chip, or the night behind the plate stays on the menu.
+**PLAY** is the gold button. Only that rectangle starts a run, along with Space or Arrow Up. The hero, the collection strip, and the sky do not.
 
 In the air, the same press flaps. A held key does nothing extra.
 
-After a crash the grove freezes, then the death card comes up:
+After a crash:
 
-- **HOME** (top-left ghost chip) returns to the menu and does not restart.
-- **JOBS** and **SHOP** (top-right ghost chips) open those panels and do not start a run.
-- **RESTART** is the gold button. A tap on the card away from those chips starts the next run.
+- **HOME** returns to the menu and does not restart.
+- **CHALLENGES** and **CHESTS** open those panels and do not start a run.
+- **RESTART** is the only gold button. A tap away from it does not start the next run.
 
-**JOBS** and **SHOP** are equal ghost chips under **PLAY** on the home menu. They do not start a run.
+- **M** mutes the beeps. The speaker chip does too.
+- **1–9** equip a costume you already own. **Q** / **[** and **E** / **]** / **C** cycle owned costumes.
+- **H** draws the 34×24 hitbox.
+- **Escape**, Space, or Arrow Up closes chests, collection, or challenges.
 
-- **M** mutes the beeps. The ghost speaker chip at the top-left of the home menu does too. There is no settings wall.
-- **K** on the home menu toggles clean mode. `?clean=1` forces it on. `?clean=0` forces it off. A clean run shows a **CLEAN** chip in the air and spawns no pickups.
-- **1–5** equip a skin you already own. **Q** / **[** and **E** / **]** / **C** cycle owned skins.
-- **H** draws the hitbox.
-- **Escape**, Space, or Arrow Up closes the shop or jobs panel.
+## Coins and chests
 
-## Local-only history
+Coins are the only soft currency. They stay in this browser. An old nug balance migrates to coins once, one for one.
 
-Best score, nugs, jobs, claimed rewards, mute, clean mode, and the equipped skin stay in this browser (`localStorage`). Nothing is uploaded. Clearing site data resets them. A new device starts at zero.
+A run banks **+1 coin per stack cleared**, plus a near-miss skim of **+1** when the hitbox edge passes within 6px of a lip, capped at **+5** per run. The first run of a calendar day adds **+10** coins. The streak count caps at **7** and resets after a missed day.
 
-The public repo is [github.com/TosZK-Hub/flappy-blunt](https://github.com/TosZK-Hub/flappy-blunt). The same files are the GitHub Pages site.
+| Chest | Cost | Pull |
+|-------|------|------|
+| Street | 100 | Common 70% · Rare 24% · Epic 5.5% · Legendary 0.5% |
+| Township | 300 | Common 40% · Rare 40% · Epic 17% · Legendary 3% |
+| Bok | 750 | Common 15% · Rare 40% · Epic 35% · Legendary 10% |
 
-## Monetize off
+Costumes come from chests. Township Tee (`starter_tee`) is free. A duplicate refunds **40%** of that chest. After 10 Street opens with no Rare or better, the next Street pull is at least Rare. After 5 Township or Bok opens with no Epic or better, the next pull is at least Epic. Owning all 12 costumes grants **+150** coins once.
 
-No in-app purchases, no ads, no analytics vendor. Nugs are a local cosmetic balance. Score banks 1:1 into nugs when you crash. The leaf counter sits top-right.
-
-Jobs refresh every 24 hours on this device: clear 5 pipes (25), score 15 in one run (50), die 3 times (15), and a weekly best of 30 (150). Each row shows the goal, progress as X/Y, the payout, and **CLAIM**. **CLAIM** is gold only when the job is ready. Claiming banks nugs and pops the leaf on the counter. Jobs never ask for a power-up.
-
-On a crash, if any job moved forward, one cream toast says “Job +1” for under 1.5 seconds. It does not cover **RESTART**.
-
-The shop sells cosmetics only. Default is free. Gold Chain is 200, Neon Kush 350, Galaxy Roll 500, OG Heist 750. Cards read **OWNED**, **EQUIPPED**, or **LOCKED**. Owned skins show a green check. The equipped skin has a gold ring. Hover or focus a card and that blunt bobs in place — a look, not a trial run. Tap an owned card to equip it immediately. Close the shop and the home hero wears it. A locked skin you cannot afford whispers “Earn nugs on runs”. The shop never says “Buy now”.
-
-## Progression
-
-Three free beats, once each, on this device. No XP bar, no battle pass, no ad gate.
-
-- The first time you clear 5 pipes, a cream whisper lands with 25 nugs.
-- When your best reaches 15, a toast says “Heist warming up”.
-- Own two or more skins and the home blunt wears a gold ring. It marks the equipped skin. It is not a paywall.
-
-## Clean mode and pickups
-
-Between the gates, one pickup can be live at a time. A new one replaces the old. The first appears after the third pipe, then every 4–6 pipes.
-
-- **24K Nug** — the next pipe exit pays +2, once.
-- **Purple Haze** — score ×2 for 6 seconds.
-- **Dab Rocket** — scroll ×1.25 for 4 seconds.
-- **Gummies** — gravity ×0.7 for 5 seconds.
-- **Gold Chip** — one hit. The gold hex pops off, then 0.4s of i-frames.
-- **Trail Can** — rainbow trail for 8 seconds. No gameplay change.
-
-When a timer ends, gravity, flap, and scroll snap back in the same step. **CLEAN** spawns nothing.
+There is no skin shop, no IAP, no ads, and no mid-run pay power-up.
 
 ## Feel lock
 
-All of the tuned numbers live in `js/feel.js` as `CONFIG`. Physics and the death beat read that object. Do not copy them elsewhere, and do not retune them for launch.
+Numbers live in `js/feel.js`. A flap **sets** upward speed to **−440**. Gravity is **1450**. Fall caps at **540**. The hitbox is **34×24** and does not change with costume or squash.
 
-A puff **sets** upward speed (`FLAP_IMPULSE` −440) and a held key does nothing. Gravity is 1450. The fall cap is 540. The hitbox is a 34×24 box, inset in the drawn blunt. Scroll starts at 165 px/s and reaches 245 by 20 puffs. Gate gaps start at 155 px, ease toward 135 by 25, and never go under 125. Pairs sit 220 px apart. The first gate can touch you 1.4 s after the run starts.
+Scroll, gap, and spacing follow the score bands in `art/sa-cartoon/TOTAL_UPGRADE_MECHANICS.md`: Teach, Warm, Rise, Heat, Legend. Gap never goes under **128**. Scroll caps at **250**. The first gate can touch you **1.4s** after the run starts.
 
-On a crash the grove freezes for 0.15 s, a death-juice flash lasts 0.08 s, the card waits 0.4 s, then one tap starts the next run. You score +1 when you cross a gate's center line. A flap tips the blunt up 12° and throws 3–5 sparks. Falling settles the tip to −8°, then the wrap goes ash. Flaps and scores do not shake the camera. On a crash the world settles at most 4 px for 120 ms, then holds still.
+From score **16**, pairs cycle Straight, Rise, Fall, and Breath. From score **31**, one pack in four bobs **±8px** at **0.55 Hz**, with an amber lip mark before it enters. Flap squash is draw-only: **sx 0.88 / sy 1.12** for **70–90ms**.
+
+Best score titles: **Rookie** at 10, **Squad** at 25, **Legend** at 50.
 
 ## Layout
 
-- `index.html` — page shell, splash, manifest
-- `manifest.webmanifest` — Add to Home Screen
-- `sw.js` — shell cache
-- `css/style.css` — full-window canvas, splash, Anton and Lilita One
-- `js/feel.js` — `CONFIG`, palette, skins, pickup timings
-- `js/physics.js` — simulation, reads `CONFIG`
-- `js/meta.js` — nugs, 24h jobs, skin shop
-- `js/render.js` — winged blunt, grinders, Wanted slab, Night Heist panels
-- `js/audio.js` — synthesized puff / chime / thud
-- `js/game.js` — home menu, play, game over
-- `assets/` — fonts, splash, and app icons (180, 192, 512, 1024)
-- `store/` — lead crops: home, mid-gap, shop, death (portrait `store-0N-*.png` and landscape `landscape-0N-*.png`)
-
-## Font
-
-[Anton](https://fonts.google.com/specimen/Anton) by Vernon Adams and [Lilita One](https://fonts.google.com/specimen/Lilita+One) by Juan Montoreano are included under the SIL Open Font License. See `assets/OFL-Anton.txt` and `assets/OFL-LilitaOne.txt`.
-
-## Not this
-
-This is an original game. It is not Flappy Bird, and it does not use that game's bird, pipes, or art. No store-submit automation ships with this repo.
+- `index.html` — page shell
+- `js/feel.js` — palette, costumes, bands, flap squash
+- `js/physics.js` — simulation
+- `js/meta.js` — coins, chests, challenges
+- `js/render.js` — canvas hero, obstacles, UI
+- `js/game.js` — home, flight, results
+- `art/sa-cartoon/` — art lock sheets and the SA briefs
